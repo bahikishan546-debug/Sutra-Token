@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -10,16 +10,19 @@
         body { background: #0b0e14; color: #ffffff; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         
         .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .profile-box { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 25px; }
-        .profile-pic { width: 36px; height: 36px; border-radius: 50%; background: #00d2ff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #000; }
-        .profile-name { font-size: 14px; font-weight: 600; }
+        .profile-box { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 25px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.1s; }
+        .profile-box:active { transform: scale(0.95); }
+        .profile-pic { width: 36px; height: 36px; border-radius: 50%; background: #00d2ff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #000; overflow: hidden; }
+        .profile-pic img { width: 100%; height: 100%; object-fit: cover; }
+        .profile-name { font-size: 14px; font-weight: 600; max-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .sst-badge { background: linear-gradient(135deg, #f59e0b, #ea580c); padding: 5px 12px; border-radius: 20px; text-align: right; }
-        .sst-title { font-size: 12px; font-weight: bold; }
-        .sst-sub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
+        .wallet-btn { background: linear-gradient(135deg, #f59e0b, #ea580c); padding: 5px 12px; border-radius: 20px; text-align: right; border: none; cursor: pointer; color: white; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); transition: transform 0.1s; }
+        .wallet-btn:active { transform: scale(0.95); }
+        .wallet-title { font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 4px; }
+        .wallet-sub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; text-align: left; }
 
         .balance-card { text-align: center; margin: 10px 0 20px 0; }
-        .balance-title { font-size: 12px; color: #9ca3af; text-transform: uppercase; }
+        .balance-title { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
         .balance-amount { font-size: 40px; font-weight: 900; color: #38bdf8; text-shadow: 0 0 15px rgba(56, 189, 248, 0.4); margin-top: 5px; }
 
         .mine-container { margin: 15px 0; position: relative; }
@@ -41,11 +44,29 @@
         .booster-btn { background: linear-gradient(90deg, #ec4899, #8b5cf6); border: none; color: white; padding: 10px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; width: 100%; margin-top: 10px; }
 
         .ref-card { width: 100%; background: #1f2937; border-radius: 15px; padding: 15px; margin-top: 15px; }
-        .ref-card h3 { font-size: 14px; margin-bottom: 10px; color: #f3f4f6; }
-        .social-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .s-btn { padding: 10px; border-radius: 8px; font-size: 12px; font-weight: bold; color: white; text-align: center; text-decoration: none; display: block; }
+        .ref-card h3 { font-size: 14px; margin-bottom: 4px; color: #f3f4f6; }
+        .ref-desc { font-size: 11px; color: #9ca3af; margin-bottom: 10px; }
+        .social-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .s-btn { padding: 10px; border-radius: 8px; font-size: 12px; font-weight: bold; color: white; text-align: center; text-decoration: none; display: block; border: none; cursor: pointer; }
+        .btn-main-share { background: linear-gradient(135deg, #10b981, #047857); grid-column: span 2; font-size: 13px; }
         .btn-wa { background: #25D366; } .btn-tg { background: #0088cc; }
         .btn-fb { background: #1877F2; } .btn-x { background: #000000; border: 1px solid #333; }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-content { background: #1f2937; width: 100%; max-width: 350px; border-radius: 20px; padding: 20px; text-align: center; border: 1px solid #374151; }
+        .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #38bdf8; }
+        .modal-balance-box { background: #111827; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .modal-bal-lbl { font-size: 11px; color: #9ca3af; text-transform: uppercase; }
+        .modal-bal-val { font-size: 24px; font-weight: bold; color: #f59e0b; margin-top: 5px; }
+        .sst-status-box { background: rgba(245, 158, 11, 0.1); border: 1px dashed #f59e0b; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-size: 12px; color: #fcd34d; }
+        
+        .input-group { margin-bottom: 12px; text-align: left; }
+        .input-group label { font-size: 11px; color: #9ca3af; display: block; margin-bottom: 4px; }
+        .input-group input { width: 100%; padding: 10px; background: #111827; border: 1px solid #374151; border-radius: 8px; color: white; font-size: 14px; }
+
+        .modal-btn { background: #2563eb; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; margin-bottom: 8px; }
+        .close-modal { background: #ef4444; color: white; border: none; width: 100%; padding: 10px; border-radius: 10px; font-weight: bold; cursor: pointer; }
 
         #adOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000e6; z-index: 1000; flex-direction: column; align-items: center; justify-content: center; }
         .ad-text { font-size: 18px; font-weight: bold; color: white; margin-bottom: 15px; text-align: center; }
@@ -59,19 +80,57 @@
         <div class="ad-timer" id="adTimerNumber">15</div>
     </div>
 
-    <div class="top-bar">
-        <div class="profile-box">
-            <div class="profile-pic" id="uPic">S</div>
-            <div class="profile-name" id="uName">Miner</div>
-        </div>
-        <div class="sst-badge">
-            <div class="sst-title">🪙 $SST Coin</div>
-            <div class="sst-sub">Coming Soon</div>
+    <!-- Wallet & Withdraw Modal -->
+    <div id="walletModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">💳 My Wallet & Assets</div>
+            <div class="modal-balance-box">
+                <div class="modal-bal-lbl">Total Mined $SUTRA</div>
+                <div class="modal-bal-val" id="modalTokenBal">0.000</div>
+            </div>
+            <div class="sst-status-box">
+                🪙 <b>$SST Coin</b><br>Coming Soon (Mainnet Launch & Listing)
+            </div>
+            <button class="modal-btn" style="background: #374151; cursor: not-allowed;" id="withdrawBtn">🔒 Withdraw (Coming Soon)</button>
+            <button class="close-modal" onclick="toggleModal('walletModal', false)">Close</button>
         </div>
     </div>
 
+    <!-- Profile Edit Modal -->
+    <div id="profileModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">✏️ Edit Profile</div>
+            <div class="input-group">
+                <label>Your Name</label>
+                <input type="text" id="nameInput" placeholder="Enter your name">
+            </div>
+            <div class="input-group">
+                <label>Profile Picture URL</label>
+                <input type="text" id="picInput" placeholder="Paste image link here">
+            </div>
+            <button class="modal-btn" onclick="saveProfile()">Save Profile</button>
+            <button class="close-modal" onclick="toggleModal('profileModal', false)">Cancel</button>
+        </div>
+    </div>
+
+    <div class="top-bar">
+        <!-- Profile Box (Click to edit name/photo) -->
+        <div class="profile-box" onclick="toggleModal('profileModal', true)">
+            <div class="profile-pic" id="uPicContainer">
+                <span id="uPicText">S</span>
+            </div>
+            <div class="profile-name" id="uName">Miner</div>
+        </div>
+
+        <!-- Wallet Button (Click to open wallet & withdraw options) -->
+        <button class="wallet-btn" onclick="toggleModal('walletModal', true)">
+            <div class="wallet-title">💳 Wallet</div>
+            <div class="wallet-sub">$SST Coming Soon</div>
+        </button>
+    </div>
+
     <div class="balance-card">
-        <div class="balance-title">कुल सूत्र टोकन ($SUTRA)</div>
+        <div class="balance-title">Total Mined $SUTRA</div>
         <div class="balance-amount" id="tokenBalance">0.000</div>
     </div>
 
@@ -84,13 +143,15 @@
     </div>
 
     <div class="booster-card">
-        <div class="booster-title">🚀 3x माइनिंग बूस्टर (1000 SUTRA / 4h)</div>
+        <div class="booster-title">🚀 3x Mining Booster (1000 SUTRA / 4h)</div>
         <button class="booster-btn" id="boostBtn" onclick="handleBooster()">⚡ Watch Ad (Unlock 2x Step)</button>
     </div>
 
     <div class="ref-card">
-        <h3>👥 रेफरल और सोशल शेयर</h3>
+        <h3>👥 Referral & Social Share</h3>
+        <div class="ref-desc">Invite friends and get <b>500 $SUTRA</b> bonus instantly!</div>
         <div class="social-grid">
+            <button class="s-btn btn-main-share" onclick="nativeShare()">📤 Invite Friends (Share via Apps)</button>
             <a id="waShare" class="s-btn btn-wa" target="_blank">WhatsApp</a>
             <a id="tgShare" class="s-btn btn-tg" target="_blank">Telegram</a>
             <a id="fbShare" class="s-btn btn-fb" target="_blank">Facebook</a>
@@ -103,9 +164,42 @@
         if (tg) { tg.expand(); tg.ready(); }
 
         const user = tg?.initDataUnsafe?.user;
-        const displayName = user ? user.first_name : "Kishan";
-        document.getElementById('uName').innerText = displayName;
-        document.getElementById('uPic').innerText = displayName.charAt(0).toUpperCase();
+        
+        let savedName = localStorage.getItem('sst_custom_name') || (user ? user.first_name : "Miner");
+        let savedPic = localStorage.getItem('sst_custom_pic') || "";
+
+        function renderProfile() {
+            document.getElementById('uName').innerText = savedName;
+            const picContainer = document.getElementById('uPicContainer');
+            if (savedPic) {
+                picContainer.innerHTML = `<img src="${savedPic}" alt="Profile">`;
+            } else {
+                picContainer.innerHTML = `<span id="uPicText">${savedName.charAt(0).toUpperCase()}</span>`;
+            }
+        }
+        renderProfile();
+
+        function saveProfile() {
+            const n = document.getElementById('nameInput').value.trim();
+            const p = document.getElementById('picInput').value.trim();
+            if (n) { savedName = n; localStorage.setItem('sst_custom_name', n); }
+            if (p) { savedPic = p; localStorage.setItem('sst_custom_pic', p); }
+            renderProfile();
+            toggleModal('profileModal', false);
+        }
+
+        // Referral System: +500 SUTRA bonus for joining via ref link
+        const urlParams = new URLSearchParams(window.location.search);
+        const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('start');
+        
+        let balance = parseFloat(localStorage.getItem('sst_bal')) || 0;
+
+        if (startParam && startParam.startsWith('ref_') && !localStorage.getItem('sst_ref_claimed')) {
+            balance += 500;
+            localStorage.setItem('sst_bal', balance);
+            localStorage.setItem('sst_ref_claimed', 'true');
+            alert("🎉 Congratulations! You received 500 $SUTRA referral bonus!");
+        }
 
         const DURATION_24H = 24 * 60 * 60 * 1000;
         const DURATION_3H = 3 * 60 * 60 * 1000;
@@ -113,7 +207,6 @@
         const BASE_RATE = 2017 / (24 * 60 * 60);
         const BOOST_RATE = 1000 / (4 * 60 * 60); 
 
-        let balance = parseFloat(localStorage.getItem('sst_bal')) || 0;
         let lastCalcTime = parseInt(localStorage.getItem('sst_last_calc')) || Date.now();
         let miningStartTime = parseInt(localStorage.getItem('sst_mine_start')) || 0;
         
@@ -156,6 +249,7 @@
 
         function updateUI(now, isMiningActive, isBoostActive) {
             document.getElementById('tokenBalance').innerText = balance.toFixed(3);
+            document.getElementById('modalTokenBal').innerText = balance.toFixed(3);
 
             const mBtn = document.getElementById('mineBtn');
             const mText = document.getElementById('mineText');
@@ -208,13 +302,13 @@
                 miningStartTime = Date.now();
                 lastCalcTime = Date.now();
                 localStorage.setItem('sst_mine_start', miningStartTime);
-                alert("✅ माइनिंग सफलतापूर्वक शुरू हो गई है!");
+                alert("✅ Mining started successfully!");
             });
         }
 
         function handleBooster() {
             if (boostStep === 3) {
-                alert("आपका 3x बूस्ट पहले से चालू है!");
+                alert("Your 3x boost is already active!");
                 return;
             }
 
@@ -223,18 +317,38 @@
                 if (boostStep === 3) {
                     boostStartTime = Date.now();
                     localStorage.setItem('sst_boost_start', boostStartTime);
-                    alert("🔥 3x बूस्टर 3 घंटे के लिए एक्टिवेट हो गया!");
+                    alert("🔥 3x Booster activated for 3 hours!");
                 } else {
-                    alert(`✅ स्टेप ${boostStep} पूरा हुआ!`);
+                    alert(`✅ Step ${boostStep} completed!`);
                 }
                 localStorage.setItem('sst_boost_step', boostStep);
             });
         }
 
+        function toggleModal(modalId, show) {
+            document.getElementById(modalId).style.display = show ? 'flex' : 'none';
+            if(modalId === 'profileModal' && show) {
+                document.getElementById('nameInput').value = savedName;
+                document.getElementById('picInput').value = savedPic;
+            }
+        }
+
         setInterval(calculateEarnings, 1000);
 
-        const refLink = `https://t.me/SutraTokenBot?start=ref_${user?.id || 'm'}`;
-        const sTxt = encodeURIComponent(`🚀 Sutra Token माइनिंग चालू है! फ्री 2,017 $SUTRA कमाएं: ${refLink}`);
+        const refLink = `https://t.me/SutraTokenBot?start=ref_${user?.id || 'miner'}`;
+        const sTxt = encodeURIComponent(`🚀 Join Sutra Token Mining App and get 500 $SUTRA bonus instantly!\n\nJoin here: ${refLink}`);
+
+        function nativeShare() {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Sutra Token Mining',
+                    text: '🚀 Join Sutra Token Mining & earn free crypto!',
+                    url: refLink,
+                }).catch(() => {});
+            } else {
+                prompt("Copy your referral link:", refLink);
+            }
+        }
 
         document.getElementById('waShare').href = `https://api.whatsapp.com/send?text=${sTxt}`;
         document.getElementById('tgShare').href = `https://t.me/share/url?url=${refLink}&text=${sTxt}`;
@@ -243,4 +357,3 @@
     </script>
 </body>
 </html>
-
