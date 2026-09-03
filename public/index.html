@@ -3,23 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Sutra Token Mining</title>
+    <title>Sutra Token Mining Ecosystem</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         body { background: #0b0e14; color: #ffffff; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         
         .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .profile-box { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); padding: 5px 12px; border-radius: 25px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.1s; }
+        
+        /* Profile & Live Counter Box */
+        .profile-box { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); padding: 6px 14px; border-radius: 25px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.1s; }
         .profile-box:active { transform: scale(0.95); }
         .profile-pic { width: 36px; height: 36px; border-radius: 50%; background: #00d2ff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #000; overflow: hidden; }
         .profile-pic img { width: 100%; height: 100%; object-fit: cover; }
-        .profile-name { font-size: 14px; font-weight: 600; max-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .profile-info { display: flex; flex-direction: column; }
+        .profile-name { font-size: 13px; font-weight: 600; max-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .profile-meter { font-size: 10px; color: #38bdf8; font-weight: bold; }
 
+        /* Wallet & Referral Count Box */
         .wallet-btn { background: linear-gradient(135deg, #f59e0b, #ea580c); padding: 5px 12px; border-radius: 20px; text-align: right; border: none; cursor: pointer; color: white; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); transition: transform 0.1s; }
         .wallet-btn:active { transform: scale(0.95); }
-        .wallet-title { font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 4px; }
-        .wallet-sub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; text-align: left; }
+        .wallet-title { font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+        .wallet-sub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; text-align: right; color: #fef08a; font-weight: bold; }
 
         .balance-card { text-align: center; margin: 10px 0 20px 0; }
         .balance-title { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -85,11 +90,11 @@
         <div class="modal-content">
             <div class="modal-title">💳 My Wallet & Assets</div>
             <div class="modal-balance-box">
-                <div class="modal-bal-lbl">Total Mined $SUTRA</div>
+                <div class="modal-bal-lbl">Total Mined $SUTRA (Fixed Supply: 1B)</div>
                 <div class="modal-bal-val" id="modalTokenBal">0.000</div>
             </div>
             <div class="sst-status-box">
-                🪙 <b>$SST Coin</b><br>Coming Soon (Mainnet Launch & Listing)
+                🪙 <b>$SST Coin</b> (Rate: 1000 SUTRA = 1 SST)<br>Coming Soon (Mainnet Launch & Listing)
             </div>
             <button class="modal-btn" style="background: #374151; cursor: not-allowed;" id="withdrawBtn">🔒 Withdraw (Coming Soon)</button>
             <button class="close-modal" onclick="toggleModal('walletModal', false)">Close</button>
@@ -114,23 +119,26 @@
     </div>
 
     <div class="top-bar">
-        <!-- Profile Box (Click to edit name/photo) -->
+        <!-- Profile Box with Live Mining Meter underneath -->
         <div class="profile-box" onclick="toggleModal('profileModal', true)">
             <div class="profile-pic" id="uPicContainer">
                 <span id="uPicText">S</span>
             </div>
-            <div class="profile-name" id="uName">Miner</div>
+            <div class="profile-info">
+                <div class="profile-name" id="uName">Miner</div>
+                <div class="profile-meter" id="liveMeter">⚡ 0.000 Mined</div>
+            </div>
         </div>
 
-        <!-- Wallet Button (Click to open wallet & withdraw options) -->
+        <!-- Wallet Button with Referral Count Meter underneath -->
         <button class="wallet-btn" onclick="toggleModal('walletModal', true)">
             <div class="wallet-title">💳 Wallet</div>
-            <div class="wallet-sub">$SST Coming Soon</div>
+            <div class="wallet-sub" id="refMeterText">👥 0 Referred</div>
         </button>
     </div>
 
     <div class="balance-card">
-        <div class="balance-title">Total Mined $SUTRA</div>
+        <div class="balance-title">Total Mined $SUTRA (Fixed 1 Billion)</div>
         <div class="balance-amount" id="tokenBalance">0.000</div>
     </div>
 
@@ -165,7 +173,7 @@
 
         const user = tg?.initDataUnsafe?.user;
         
-        let savedName = localStorage.getItem('sst_custom_name') || (user ? user.first_name : "Miner");
+        let savedName = localStorage.getItem('sst_custom_name') || (user ? user.first_name : "Kishan gupta");
         let savedPic = localStorage.getItem('sst_custom_pic') || "";
 
         function renderProfile() {
@@ -188,24 +196,30 @@
             toggleModal('profileModal', false);
         }
 
-        // Referral System: +500 SUTRA bonus for joining via ref link
+        // Referral & Count Meter Logic
         const urlParams = new URLSearchParams(window.location.search);
         const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('start');
         
         let balance = parseFloat(localStorage.getItem('sst_bal')) || 0;
+        let referralCount = parseInt(localStorage.getItem('sst_ref_count')) || 0;
 
         if (startParam && startParam.startsWith('ref_') && !localStorage.getItem('sst_ref_claimed')) {
             balance += 500;
+            referralCount += 1;
             localStorage.setItem('sst_bal', balance);
+            localStorage.setItem('sst_ref_count', referralCount);
             localStorage.setItem('sst_ref_claimed', 'true');
             alert("🎉 Congratulations! You received 500 $SUTRA referral bonus!");
         }
 
+        // Update Referral Meter UI
+        document.getElementById('refMeterText').innerText = `👥 ${referralCount} Referred`;
+
         const DURATION_24H = 24 * 60 * 60 * 1000;
         const DURATION_3H = 3 * 60 * 60 * 1000;
         
-        const BASE_RATE = 2017 / (24 * 60 * 60);
-        const BOOST_RATE = 1000 / (4 * 60 * 60); 
+        const BASE_RATE = 10000 / (24 * 60 * 60); // 1 Billion Supply Scale
+        const BOOST_RATE = 4000 / (4 * 60 * 60); 
 
         let lastCalcTime = parseInt(localStorage.getItem('sst_last_calc')) || Date.now();
         let miningStartTime = parseInt(localStorage.getItem('sst_mine_start')) || 0;
@@ -250,6 +264,7 @@
         function updateUI(now, isMiningActive, isBoostActive) {
             document.getElementById('tokenBalance').innerText = balance.toFixed(3);
             document.getElementById('modalTokenBal').innerText = balance.toFixed(3);
+            document.getElementById('liveMeter').innerText = `⚡ ${balance.toFixed(3)}`;
 
             const mBtn = document.getElementById('mineBtn');
             const mText = document.getElementById('mineText');
@@ -336,24 +351,28 @@
         setInterval(calculateEarnings, 1000);
 
         const refLink = `https://t.me/SutraTokenBot?start=ref_${user?.id || 'miner'}`;
-        const sTxt = encodeURIComponent(`🚀 Join Sutra Token Mining App and get 500 $SUTRA bonus instantly!\n\nJoin here: ${refLink}`);
+        const shareText = `🚀 Join Sutra Token Mining App and get 500 $SUTRA bonus instantly!\n\nJoin here: ${refLink}`;
 
         function nativeShare() {
             if (navigator.share) {
                 navigator.share({
                     title: 'Sutra Token Mining',
-                    text: '🚀 Join Sutra Token Mining & earn free crypto!',
+                    text: shareText,
                     url: refLink,
                 }).catch(() => {});
             } else {
-                prompt("Copy your referral link:", refLink);
+                if (tg && tg.openTelegramLink) {
+                    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`);
+                } else {
+                    prompt("Copy your referral link:", refLink);
+                }
             }
         }
 
-        document.getElementById('waShare').href = `https://api.whatsapp.com/send?text=${sTxt}`;
-        document.getElementById('tgShare').href = `https://t.me/share/url?url=${refLink}&text=${sTxt}`;
+        document.getElementById('waShare').href = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+        document.getElementById('tgShare').href = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`;
         document.getElementById('fbShare').href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(refLink)}`;
-        document.getElementById('xShare').href = `https://twitter.com/intent/tweet?text=${sTxt}`;
+        document.getElementById('xShare').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
     </script>
 </body>
 </html>
