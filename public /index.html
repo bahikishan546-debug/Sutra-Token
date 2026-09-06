@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sutra Token Mining Ecosystem</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Firebase Initialization Script -->
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      getDoc
+    } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+    import {
+      getAuth,
+      signInAnonymously
+    } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB2FiUai1PLFt1V-KC6E9z3D7xRwCc_JWM",
+      authDomain: "pulsetradeai.firebaseapp.com",
+      projectId: "pulsetradeai",
+      storageBucket: "pulsetradeai.firebasestorage.app",
+      messagingSenderId: "219674975960",
+      appId: "1:219674975960:web:bf14f9eb55e04d686781ad",
+      measurementId: "G-06WTRDLMHB"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.db = db;
+
+    const auth = getAuth(app);
+
+    signInAnonymously(auth)
+    .then(() => {
+       console.log("Anonymous Login Success");
+    })
+    .catch((error) => {
+       console.log(error);
+    });
+
+    console.log("Firebase Connected");
+
+    window.saveUserData = async function(userId, data) {
+        await setDoc(doc(db, "users", userId), data, { merge: true });
+    }
+
+    window.loadUserData = async function(userId) {
+        const snap = await getDoc(doc(db, "users", userId));
+
+        if (snap.exists()) {
+            return snap.data();
+        }
+
+        return null;
+    }
+
+    // Making auth globally accessible as requested
+    window.auth = auth;
+    </script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background: #0b0e14; color: #ffffff; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
+        
+        .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        
+        /* Profile & Global Progress Meter Box */
+        .profile-box { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); padding: 6px 12px; border-radius: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.1s; max-width: 55%; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .profile-box:active { transform: scale(0.95); }
+        .profile-pic { width: 36px; height: 36px; border-radius: 50%; background: #00d2ff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #000; overflow: hidden; flex-shrink: 0; }
+        .profile-pic img { width: 100%; height: 100%; object-fit: cover; }
+        .profile-info { display: flex; flex-direction: column; width: 100%; }
+        .profile-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #f8fafc; }
+        
+        /* Progress Bar UI */
+        .meter-title { font-size: 8px; color: #9ca3af; text-transform: uppercase; margin-top: 2px; }
+        .meter-text { font-size: 10px; color: #38bdf8; font-weight: bold; margin-bottom: 2px; }
+        .progress-bg { width: 100%; height: 4px; background: #374151; border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #2563eb); width: 0%; transition: width 1s ease-in-out; }
+
+        /* Wallet & Global Users Box */
+        .wallet-btn { background: linear-gradient(135deg, #f59e0b, #ea580c); padding: 6px 12px; border-radius: 20px; text-align: right; border: none; cursor: pointer; color: white; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); transition: transform 0.1s; max-width: 42%; }
+        .wallet-btn:active { transform: scale(0.95); }
+        .wallet-title { font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-bottom: 2px;}
+        .wallet-sub { font-size: 9px; opacity: 0.9; text-align: right; color: #fef08a; font-weight: bold; line-height: 1.3; }
+
+        .balance-card { text-align: center; margin: 15px 0 25px 0; }
+        .balance-title { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+        .balance-amount { font-size: 42px; font-weight: 900; color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4); margin-top: 5px; }
+
+        /* Main Mining Button */
+        .mine-container { margin: 15px 0; position: relative; }
+        .mine-btn {
+            width: 190px; height: 190px; border-radius: 50%; border: none;
+            background: radial-gradient(circle, #2563eb, #1e3a8a);
+            box-shadow: 0 0 30px rgba(37, 99, 235, 0.6);
+            color: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: transform 0.1s, box-shadow 0.3s;
+        }
+        .mine-btn:active { transform: scale(0.95); }
+        .mine-btn.disabled { background: radial-gradient(circle, #4b5563, #1f2937); box-shadow: 0 0 15px rgba(75, 85, 99, 0.3); pointer-events: none; }
+        .mine-icon { font-size: 45px; margin-bottom: 5px; }
+        .mine-text { font-size: 18px; font-weight: bold; }
+        .mine-time { font-size: 13px; color: #93c5fd; margin-top: 5px; }
+
+        /* Booster Card */
+        .booster-card { width: 100%; background: linear-gradient(145deg, #1e1b4b, #111827); border: 1px solid #4338ca; border-radius: 15px; padding: 15px; margin-top: 20px; text-align: center; box-shadow: 0 4px 15px rgba(67, 56, 202, 0.2); }
+        .booster-title { font-size: 14px; font-weight: bold; color: #c7d2fe; margin-bottom: 5px; transition: 0.3s; }
+        .booster-btn { background: linear-gradient(90deg, #ec4899, #8b5cf6); border: none; color: white; padding: 12px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; width: 100%; margin-top: 10px; box-shadow: 0 4px 10px rgba(236, 72, 153, 0.3); }
+        .booster-btn:active { transform: scale(0.98); }
+
+        /* Referral & Social Share */
+        .ref-card { width: 100%; background: #1f2937; border-radius: 15px; padding: 15px; margin-top: 15px; border: 1px solid #374151; }
+        .ref-card h3 { font-size: 14px; margin-bottom: 4px; color: #f3f4f6; }
+        .ref-desc { font-size: 11px; color: #9ca3af; margin-bottom: 12px; }
+        .social-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .s-btn { padding: 10px; border-radius: 8px; font-size: 12px; font-weight: bold; color: white; text-align: center; text-decoration: none; display: block; border: none; cursor: pointer; }
+        .btn-main-share { background: linear-gradient(135deg, #10b981, #047857); grid-column: span 2; font-size: 14px; padding: 12px; }
+        .btn-wa { background: #25D366; } .btn-tg { background: #0088cc; }
+        .btn-fb { background: #1877F2; } .btn-x { background: #000000; border: 1px solid #333; }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
+        .modal-content { background: #1f2937; width: 100%; max-width: 350px; border-radius: 20px; padding: 20px; text-align: center; border: 1px solid #374151; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #38bdf8; }
+        .modal-balance-box { background: #111827; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .modal-bal-lbl { font-size: 11px; color: #9ca3af; text-transform: uppercase; }
+        .modal-bal-val { font-size: 26px; font-weight: bold; color: #f59e0b; margin-top: 5px; }
+        .sst-status-box { background: rgba(245, 158, 11, 0.1); border: 1px dashed #f59e0b; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-size: 12px; color: #fcd34d; }
+        
+        .input-group { margin-bottom: 12px; text-align: left; }
+        .input-group label { font-size: 11px; color: #9ca3af; display: block; margin-bottom: 4px; }
+        .input-group input { width: 100%; padding: 10px; background: #111827; border: 1px solid #374151; border-radius: 8px; color: white; font-size: 14px; outline: none; }
+        .input-group input:focus { border-color: #38bdf8; }
+
+        .modal-btn { background: #2563eb; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; margin-bottom: 8px; }
+        .close-modal { background: #ef4444; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+
+        /* Full Screen Ad Overlay */
+        #adOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000ed; z-index: 3000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .ad-text { font-size: 20px; font-weight: bold; color: white; margin-bottom: 15px; text-align: center; }
+        .ad-timer { font-size: 65px; font-weight: 900; color: #facc15; text-shadow: 0 0 20px rgba(250, 204, 21, 0.5); }
+    </style>
+</head>
+<body>
+
+    <!-- AD SCREEN OVERLAY -->
+    <div id="adOverlay">
+        <div class="ad-text">Sponsor Ad Running...<br><small style="font-size: 14px; color: #9ca3af; font-weight: normal;">Please wait to unlock reward</small></div>
+        <div class="ad-timer" id="adTimerNumber">15</div>
+    </div>
+
+    <!-- WALLET MODAL -->
+    <div id="walletModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">💳 My Wallet & Assets</div>
+            <div class="modal-balance-box">
+                <div class="modal-bal-lbl">Total Mined $SUTRA (Fixed: 1B)</div>
+                <div class="modal-bal-val" id="modalTokenBal">0.000</div>
+            </div>
+            <div class="sst-status-box">
+                🪙 <b>$SST Coin</b> (Rate: 1000 SUTRA = 1 SST)<br>Coming Soon (Mainnet Launch & Listing)
+            </div>
+            <button class="modal-btn" style="background: #374151; cursor: not-allowed;" id="withdrawBtn">🔒 Withdraw (Coming Soon)</button>
+            <button class="close-modal" onclick="toggleModal('walletModal', false)">Close Window</button>
+        </div>
+    </div>
+
+    <!-- PROFILE MODAL -->
+    <div id="profileModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">✏️ Edit Profile</div>
+            <div class="input-group">
+                <label>Your Name</label>
+                <input type="text" id="nameInput" placeholder="Enter your name">
+            </div>
+            <div class="input-group">
+                <label>Profile Picture URL</label>
+                <input type="text" id="picInput" placeholder="Paste image link here">
+            </div>
+            <button class="modal-btn" onclick="saveProfile()">Save Profile</button>
+            <button class="close-modal" onclick="toggleModal('profileModal', false)">Cancel</button>
+        </div>
+    </div>
+
+    <!-- TOP HEADER BAR -->
+    <div class="top-bar">
+        <!-- Profile & Global Token Meter -->
+        <div class="profile-box" onclick="toggleModal('profileModal', true)">
+            <div class="profile-pic" id="uPicContainer">
+                <span id="uPicText">S</span>
+            </div>
+            <div class="profile-info">
+                <div class="profile-name" id="uName">Miner</div>
+                <div class="meter-title">Global Mined (1 Billion)</div>
+                <div class="meter-text" id="globalMinedText">0.00%</div>
+                <div class="progress-bg">
+                    <div class="progress-fill" id="globalProgressFill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wallet & Global Users/Referrals -->
+        <button class="wallet-btn" onclick="toggleModal('walletModal', true)">
+            <div class="wallet-title">💳 Wallet</div>
+            <div class="wallet-sub" id="globalUsersText">🌐 0 Joined<br>👥 My Refs: 0</div>
+        </button>
+    </div>
+
+    <!-- MAIN BALANCE -->
+    <div class="balance-card">
+        <div class="balance-title">My Total Mined $SUTRA</div>
+        <div class="balance-amount" id="tokenBalance">0.000</div>
+    </div>
+
+    <!-- MINING BUTTON -->
+    <div class="mine-container">
+        <button class="mine-btn" id="mineBtn" onclick="startMiningProcess()">
+            <div class="mine-icon">▶️</div>
+            <div class="mine-text" id="mineText">Play / Start</div>
+            <div class="mine-time" id="mineSubText">Watch Ad to Mine</div>
+        </button>
+    </div>
+
+    <!-- LIVE BOOSTER SYSTEM -->
+    <div class="booster-card">
+        <div class="booster-title" id="boosterTitle">🚀 2x Mining Booster (500 SUTRA / 4h)</div>
+        <button class="booster-btn" id="boostBtn" onclick="handleBooster()">⚡ Watch Ad (Activate 2x)</button>
+    </div>
+
+    <!-- REFERRAL & SOCIAL SHARE -->
+    <div class="ref-card">
+        <h3>👥 Referral & Social Share</h3>
+        <div class="ref-desc">Invite friends and get <b>500 $SUTRA</b> bonus instantly!</div>
+        <div class="social-grid">
+            <button class="s-btn btn-main-share" onclick="nativeShare()">📤 Invite Friends (Share via Apps)</button>
+            <a id="waShare" class="s-btn btn-wa" target="_blank">WhatsApp</a>
+            <a id="tgShare" class="s-btn btn-tg" target="_blank">Telegram</a>
+            <a id="fbShare" class="s-btn btn-fb" target="_blank">Facebook</a>
+            <a id="xShare"  class="s-btn btn-x"  target="_blank">X (Twitter)</a>
+        </div>
+    </div>
+
+    <script>
+        // TELEGRAM INIT
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.expand(); tg.ready(); }
+        const user = tg?.initDataUnsafe?.user;
+        
+        const telegramId = user?.id || auth.currentUser?.uid || "guest";
+        const telegramUsername = user?.username || "";
+        const telegramFirstName = user?.first_name || "";
+        
+        // PROFILE LOGIC
+        let savedName = localStorage.getItem('sst_custom_name') || (user ? user.first_name : "Kishan gupta");
+        let savedPic = localStorage.getItem('sst_custom_pic') || "";
+
+        function renderProfile() {
+            document.getElementById('uName').innerText = savedName;
+            const picContainer = document.getElementById('uPicContainer');
+            if (savedPic) {
+                picContainer.innerHTML = `<img src="${savedPic}" alt="Profile">`;
+            } else {
+                picContainer.innerHTML = `<span id="uPicText">${savedName.charAt(0).toUpperCase()}</span>`;
+            }
+        }
+        renderProfile();
+
+        (async () => {
+            const userId = String(user?.id || auth.currentUser?.uid || "guest");
+
+            const data = await loadUserData(userId);
+
+            if (data) {
+                balance = data.balance || 0;
+                referralCount = data.referralCount || 0;
+                boostLevel = data.boostLevel || 0;
+                miningStartTime = data.miningStartTime || 0;
+            }
+
+            if (data) {
+                if (data.name) savedName = data.name;
+                if (data.photo) savedPic = data.photo;
+
+                renderProfile();
+            }
+        })();
+
+        function saveProfile() {
+            const n = document.getElementById('nameInput').value.trim();
+            const p = document.getElementById('picInput').value.trim();
+            if (n) { savedName = n; localStorage.setItem('sst_custom_name', n); }
+            if (p) { savedPic = p; localStorage.setItem('sst_custom_pic', p); }
+            renderProfile();
+            toggleModal('profileModal', false);
+
+            const userId = String(user?.id || auth.currentUser?.uid || "guest");
+
+            saveUserData(userId, {
+                name: savedName,
+                photo: savedPic
+            });
+        }
+
+        // REFERRAL BONUS LOGIC
+        const urlParams = new URLSearchParams(window.location.search);
+        const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('start');
+        
+        let balance = parseFloat(localStorage.getItem('sst_bal')) || 0.000;
+        let referralCount = parseInt(localStorage.getItem('sst_ref_count')) || 0;
+
+        if (startParam && startParam.startsWith('ref_') && !localStorage.getItem('sst_ref_claimed')) {
+            balance += 500;
+            referralCount += 1;
+            localStorage.setItem('sst_bal', balance);
+            localStorage.setItem('sst_ref_count', referralCount);
+            localStorage.setItem('sst_ref_claimed', 'true');
+            
+            const referrerId = startParam.replace('ref_', '');
+            const userId = String(user?.id || auth.currentUser?.uid || "guest");
+            
+            saveUserData(userId, {
+               referredBy: referrerId
+            });
+
+            alert("🎉 Congratulations! You received 500 $SUTRA referral bonus!");
+        }
+
+        // 🌟 GLOBAL METERS SIMULATION (Hack-proof UI Live Update)
+        const TOTAL_SUPPLY = 1000000000; 
+        let globalMined = parseFloat(localStorage.getItem('sst_global_mined')) || 12450890.5; 
+        let globalUsers = parseInt(localStorage.getItem('sst_global_users')) || 45210; 
+
+        function updateGlobalMeters() {
+            localStorage.setItem('sst_global_mined', globalMined);
+            localStorage.setItem('sst_global_users', globalUsers);
+
+            let percent = (globalMined / TOTAL_SUPPLY) * 100;
+            let formattedMined = (globalMined / 1000000).toFixed(2); 
+
+            document.getElementById('globalMinedText').innerText = `${formattedMined}M / 1B (${percent.toFixed(3)}%)`;
+            document.getElementById('globalProgressFill').style.width = `${percent}%`;
+            document.getElementById('globalUsersText').innerHTML = `🌐 ${globalUsers.toLocaleString()} Joined<br>👥 My Refs: ${referralCount}`;
+        }
+        setInterval(updateGlobalMeters, 2000); 
+
+        // MINING LIMITS & RATES (Fixed professionally)
+        const DURATION_24H = 24 * 60 * 60 * 1000;
+        const DURATION_4H = 4 * 60 * 60 * 1000;
+        
+        // Exact 2000 Tokens strictly in 24 Hours Base Limit
+        const BASE_RATE = 2000 / (24 * 60 * 60); 
+
+        // Progressive Booster Rates over 4 Hours
+        const BOOST_RATE_2X = 500 / (4 * 60 * 60);
+        const BOOST_RATE_3X = 1000 / (4 * 60 * 60);
+        const BOOST_RATE_4X = 1500 / (4 * 60 * 60);
+
+        let lastCalcTime = parseInt(localStorage.getItem('sst_last_calc')) || Date.now();
+        let miningStartTime = parseInt(localStorage.getItem('sst_mine_start')) || 0;
+        
+        let boostLevel = parseInt(localStorage.getItem('sst_boost_lvl')) || 0;
+        let boostStartTime = parseInt(localStorage.getItem('sst_boost_start')) || 0;
+
+        function calculateEarnings() {
+            let now = Date.now();
+            let deltaSec = (now - lastCalcTime) / 1000;
+            
+            let isMiningActive = (now - miningStartTime) < DURATION_24H && miningStartTime > 0;
+            let isBoostActive = boostLevel > 0 && (now - boostStartTime) < DURATION_4H;
+
+            if (isMiningActive) {
+                let currentRate = BASE_RATE;
+                
+                if (isBoostActive) {
+                    if (boostLevel === 1) currentRate += BOOST_RATE_2X;
+                    else if (boostLevel === 2) currentRate += BOOST_RATE_3X;
+                    else if (boostLevel === 3) currentRate += BOOST_RATE_4X;
+                }
+                balance += (deltaSec * currentRate);
+            } 
+            
+            // Check Expirations
+            if (now - miningStartTime >= DURATION_24H && miningStartTime > 0) {
+                miningStartTime = 0; 
+                localStorage.setItem('sst_mine_start', 0);
+            }
+            if (boostLevel > 0 && now - boostStartTime >= DURATION_4H) {
+                boostLevel = 0;
+                localStorage.setItem('sst_boost_lvl', 0);
+            }
+
+            lastCalcTime = now;
+            localStorage.setItem('sst_bal', balance);
+            localStorage.setItem('sst_last_calc', lastCalcTime);
+
+            const userId = String(user?.id || auth.currentUser?.uid || "guest");
+            saveUserData(userId, {
+                balance: balance,
+                name: savedName,
+                photo: savedPic,
+                referralCount: referralCount,
+                boostLevel: boostLevel,
+                miningStartTime: miningStartTime,
+                lastUpdated: Date.now()
+            });
+
+            updateUI(now, isMiningActive, isBoostActive);
+        }
+
+        function formatTime(ms) {
+            let h = Math.floor(ms / (1000*60*60));
+            let m = Math.floor((ms % (1000*60*60)) / (1000*60));
+            let s = Math.floor((ms % (1000*60)) / 1000);
+            return `${h}h ${m}m ${s}s`;
+        }
+
+        function updateUI(now, isMiningActive, isBoostActive) {
+            document.getElementById('tokenBalance').innerText = balance.toFixed(3);
+            document.getElementById('modalTokenBal').innerText = balance.toFixed(3);
+
+            const mBtn = document.getElementById('mineBtn');
+            const mText = document.getElementById('mineText');
+            const mSubText = document.getElementById('mineSubText');
+
+            if (isMiningActive) {
+                mBtn.classList.add('disabled');
+                mText.innerText = "⛏️ Mining...";
+                let timeLeft = DURATION_24H - (now - miningStartTime);
+                mSubText.innerText = formatTime(timeLeft) + " left";
+            } else {
+                mBtn.classList.remove('disabled');
+                mText.innerText = "▶️ Play / Start";
+                mSubText.innerText = "Watch Ad to Mine";
+            }
+
+            const bTitle = document.getElementById('boosterTitle');
+            const bBtn = document.getElementById('boostBtn');
+            let bLeft = DURATION_4H - (now - boostStartTime);
+
+            if (boostLevel === 0) {
+                bTitle.innerText = "🚀 2x Mining Booster (500 SUTRA / 4h)";
+                bBtn.innerText = "⚡ Watch Ad (Activate 2x)";
+            } else if (boostLevel === 1) {
+                bTitle.innerText = "🚀 3x Mining Booster (1000 SUTRA / 4h)";
+                bBtn.innerText = `⚡ Watch Ad (Upgrade to 3x) - ${formatTime(bLeft)}`;
+            } else if (boostLevel === 2) {
+                bTitle.innerText = "🚀 4x Mining Booster (1500 SUTRA / 4h)";
+                bBtn.innerText = `⚡ Watch Ad (Upgrade to 4x) - ${formatTime(bLeft)}`;
+            } else if (boostLevel === 3) {
+                bTitle.innerText = "🔥 Max 4x Booster Active (1500 SUTRA / 4h)";
+                bBtn.innerText = `🔥 Active (${formatTime(bLeft)} left)`;
+            }
+        }
+
+        // AD WATCH SIMULATION
+        function showAd(callback) {
+            const overlay = document.getElementById('adOverlay');
+            const timerEl = document.getElementById('adTimerNumber');
+            let timeLeft = 15;
+            
+            overlay.style.display = 'flex';
+            timerEl.innerText = timeLeft;
+
+            let adInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(adInterval);
+                    overlay.style.display = 'none';
+                    callback();
+                }
+            }, 1000);
+        }
+
+        function startMiningProcess() {
+            if (miningStartTime > 0 && Date.now() - miningStartTime < DURATION_24H) return;
+            showAd(() => {
+                miningStartTime = Date.now();
+                lastCalcTime = Date.now();
+                localStorage.setItem('sst_mine_start', miningStartTime);
+                alert("✅ Mining started successfully! Rate: 2000 SUTRA / 24h.");
+            });
+        }
+
+        function handleBooster() {
+            if (boostLevel === 3) {
+                alert("Your Max (4x) boost is already active!");
+                return;
+            }
+            showAd(() => {
+                boostLevel++;
+                boostStartTime = Date.now();
+                localStorage.setItem('sst_boost_lvl', boostLevel);
+                localStorage.setItem('sst_boost_start', boostStartTime);
+                
+                let bonusAmount = boostLevel === 1 ? 500 : (boostLevel === 2 ? 1000 : 1500);
+                let multiplier = boostLevel + 1; 
+                alert(`🔥 ${multiplier}x Booster activated! You will earn +${bonusAmount} SUTRA over the next 4 hours!`);
+            });
+        }
+
+        function toggleModal(modalId, show) {
+            document.getElementById(modalId).style.display = show ? 'flex' : 'none';
+            if(modalId === 'profileModal' && show) {
+                document.getElementById('nameInput').value = savedName;
+                document.getElementById('picInput').value = savedPic;
+            }
+        }
+
+        // START CALCULATING EVERY SECOND
+        setInterval(calculateEarnings, 1000);
+
+        // NATIVE SHARE & SOCIAL LINKS
+        const refLink = `https://t.me/SutraTokenBot?start=ref_${user?.id || 'miner'}`;
+        const shareText = `🚀 Join Sutra Token Mining App and get 500 $SUTRA bonus instantly!\n\nJoin here: ${refLink}`;
+
+        function nativeShare() {
+            if (navigator.share) {
+                navigator.share({ title: 'Sutra Token Mining', text: shareText, url: refLink }).catch(() => {});
+            } else {
+                if (tg && tg.openTelegramLink) {
+                    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`);
+                } else {
+                    prompt("Copy your referral link:", refLink);
+                }
+            }
+        }
+
+        document.getElementById('waShare').href = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+        document.getElementById('tgShare').href = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`;
+        document.getElementById('fbShare').href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(refLink)}`;
+        document.getElementById('xShare').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    </script>
+</body>
+</html>
+
