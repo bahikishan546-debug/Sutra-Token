@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sutra Token Mining Ecosystem</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Firebase Initialization Script -->
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      getDoc,
+      updateDoc,
+      collection,
+      getDocs
+    } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB2FiUai1PLFt1V-KC6E9z3D7xRwCc_JWM",
+      authDomain: "pulsetradeai.firebaseapp.com",
+      projectId: "pulsetradeai",
+      storageBucket: "pulsetradeai.firebasestorage.app",
+      messagingSenderId: "219674975960",
+      appId: "1:219674975960:web:bf14f9eb55e04d686781ad",
+      measurementId: "G-06WTRDLMHB"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.db = db;
+
+    const auth = getAuth(app);
+
+    console.log("Firebase Connected");
+
+    window.saveUserData = async function(userId, data) {
+        if (!userId) return;
+        await setDoc(doc(db, "users", userId), data, { merge: true });
+    }
+
+    window.loadUserData = async function(userId) {
+        if (!userId) return null;
+        try {
+            const snap = await getDoc(doc(db, "users", userId));
+            if (snap.exists()) {
+                return snap.data();
+            }
+        } catch(err) {
+            console.log("Load Error:", err);
+        }
+        return null;
+    }
+
+    window.auth = auth;
+
+    onAuthStateChanged(auth, (user) => {
+        if(user){
+            document.getElementById("loginBox").style.display = "none";
+
+            // Online & Last Seen Update
+            const userId = getUserId();
+            if(!userId){
+                alert("Please Login First");
+                return;
+            }
+            try {
+                window.saveUserData(userId, {
+                    online: true,
+                    lastSeen: Date.now(),
+                    version: 1
+                });
+            } catch(err) {
+                console.log("Save Error:", err);
+            }
+
+            if(user.displayName){
+                window.savedName = user.displayName;
+            }
+            if(user.photoURL){
+                window.savedPic = user.photoURL;
+            }
+            
+            // Calling the global render function
+            if (typeof window.renderProfile === "function") {
+                window.renderProfile();
+            }
+        } else {
+            document.getElementById("loginBox").style.display = "block";
+        }
+    });
+
+    const provider = new GoogleAuthProvider();
+
+    window.googleLogin = async function () {
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+
+            const userId = getUserId();
+            if(!userId){
+                alert("Please Login First");
+                return;
+            }
+
+            try {
+                await window.saveUserData(userId, {
+                    name: user.displayName,
+                    email: user.email,
+                    photo: user.photoURL,
+                    device: navigator.userAgent,
+                    lastSeen: Date.now(),
+                    online: true,
+                    version: 1
+                });
+            } catch(err) {
+                console.log("Save Error:", err);
+            }
+
+            alert("Google Login Success");
+            location.reload();
+        } catch(err) {
+            console.log(err);
+            alert(err.message);
+        }
+    }
+    </script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background: #0b0e14; color: #ffffff; padding: 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
+        
+        .top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        
+        /* Profile & Global Progress Meter Box */
+        .profile-box { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.08); padding: 6px 12px; border-radius: 20px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.1s; max-width: 55%; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .profile-box:active { transform: scale(0.95); }
+        .profile-pic { width: 36px; height: 36px; border-radius: 50%; background: #00d2ff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; color: #000; overflow: hidden; flex-shrink: 0; }
+        .profile-pic img { width: 100%; height: 100%; object-fit: cover; }
+        .profile-info { display: flex; flex-direction: column; width: 100%; }
+        .profile-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #f8fafc; }
+        
+        /* Progress Bar UI */
+        .meter-title { font-size: 8px; color: #9ca3af; text-transform: uppercase; margin-top: 2px; }
+        .meter-text { font-size: 10px; color: #38bdf8; font-weight: bold; margin-bottom: 2px; }
+        .progress-bg { width: 100%; height: 4px; background: #374151; border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #2563eb); width: 0%; transition: width 1s ease-in-out; }
+
+        /* Wallet & Global Users Box */
+        .wallet-btn { background: linear-gradient(135deg, #f59e0b, #ea580c); padding: 6px 12px; border-radius: 20px; text-align: right; border: none; cursor: pointer; color: white; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); transition: transform 0.1s; max-width: 42%; }
+        .wallet-btn:active { transform: scale(0.95); }
+        .wallet-title { font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-bottom: 2px;}
+        .wallet-sub { font-size: 9px; opacity: 0.9; text-align: right; color: #fef08a; font-weight: bold; line-height: 1.3; }
+
+        .balance-card { text-align: center; margin: 15px 0 25px 0; }
+        .balance-title { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+        .balance-amount { font-size: 42px; font-weight: 900; color: #38bdf8; text-shadow: 0 0 20px rgba(56, 189, 248, 0.4); margin-top: 5px; }
+
+        /* Main Mining Button */
+        .mine-container { margin: 15px 0; position: relative; }
+        .mine-btn {
+            width: 190px; height: 190px; border-radius: 50%; border: none;
+            background: radial-gradient(circle, #2563eb, #1e3a8a);
+            box-shadow: 0 0 30px rgba(37, 99, 235, 0.6);
+            color: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: transform 0.1s, box-shadow 0.3s;
+        }
+        .mine-btn:active { transform: scale(0.95); }
+        .mine-btn:disabled { background: radial-gradient(circle, #4b5563, #1f2937); box-shadow: 0 0 15px rgba(75, 85, 99, 0.3); pointer-events: none; opacity: 0.8; }
+        .mine-icon { font-size: 45px; margin-bottom: 5px; }
+        .mine-text { font-size: 18px; font-weight: bold; }
+        .mine-time { font-size: 13px; color: #93c5fd; margin-top: 5px; }
+
+        /* Booster Card */
+        .booster-card { width: 100%; background: linear-gradient(145deg, #1e1b4b, #111827); border: 1px solid #4338ca; border-radius: 15px; padding: 15px; margin-top: 20px; text-align: center; box-shadow: 0 4px 15px rgba(67, 56, 202, 0.2); }
+        .booster-title { font-size: 14px; font-weight: bold; color: #c7d2fe; margin-bottom: 5px; transition: 0.3s; }
+        .booster-btn { background: linear-gradient(90deg, #ec4899, #8b5cf6); border: none; color: white; padding: 12px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; width: 100%; margin-top: 10px; box-shadow: 0 4px 10px rgba(236, 72, 153, 0.3); }
+        .booster-btn:active { transform: scale(0.98); }
+
+        /* Referral & Social Share */
+        .ref-card { width: 100%; background: #1f2937; border-radius: 15px; padding: 15px; margin-top: 15px; border: 1px solid #374151; }
+        .ref-card h3 { font-size: 14px; margin-bottom: 4px; color: #f3f4f6; }
+        .ref-desc { font-size: 11px; color: #9ca3af; margin-bottom: 12px; }
+        .social-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .s-btn { padding: 10px; border-radius: 8px; font-size: 12px; font-weight: bold; color: white; text-align: center; text-decoration: none; display: block; border: none; cursor: pointer; }
+        .btn-main-share { background: linear-gradient(135deg, #10b981, #047857); grid-column: span 2; font-size: 14px; padding: 12px; }
+        .btn-wa { background: #25D366; } .btn-tg { background: #0088cc; }
+        .btn-fb { background: #1877F2; } .btn-x { background: #000000; border: 1px solid #333; }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(5px); }
+        .modal-content { background: #1f2937; width: 100%; max-width: 350px; border-radius: 20px; padding: 20px; text-align: center; border: 1px solid #374151; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #38bdf8; }
+        .modal-balance-box { background: #111827; padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .modal-bal-lbl { font-size: 11px; color: #9ca3af; text-transform: uppercase; }
+        .modal-bal-val { font-size: 26px; font-weight: bold; color: #f59e0b; margin-top: 5px; }
+        .sst-status-box { background: rgba(245, 158, 11, 0.1); border: 1px dashed #f59e0b; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-size: 12px; color: #fcd34d; }
+        
+        .input-group { margin-bottom: 12px; text-align: left; }
+        .input-group label { font-size: 11px; color: #9ca3af; display: block; margin-bottom: 4px; }
+        .input-group input { width: 100%; padding: 10px; background: #111827; border: 1px solid #374151; border-radius: 8px; color: white; font-size: 14px; outline: none; }
+        .input-group input:focus { border-color: #38bdf8; }
+
+        .modal-btn { background: #2563eb; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; margin-bottom: 8px; }
+        .close-modal { background: #ef4444; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+
+        /* Full Screen Ad Overlay */
+        #adOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000ed; z-index: 3000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .ad-text { font-size: 20px; font-weight: bold; color: white; margin-bottom: 15px; text-align: center; }
+        .ad-timer { font-size: 65px; font-weight: 900; color: #facc15; text-shadow: 0 0 20px rgba(250, 204, 21, 0.5); }
+    </style>
+</head>
+<body>
+
+    <!-- AD SCREEN OVERLAY -->
+    <div id="adOverlay">
+        <div class="ad-text">Sponsor Ad Running...<br><small style="font-size: 14px; color: #9ca3af; font-weight: normal;">Please wait to unlock reward</small></div>
+        <div class="ad-timer" id="adTimerNumber">15</div>
+    </div>
+
+    <!-- WALLET MODAL -->
+    <div id="walletModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">💳 My Wallet & Assets</div>
+            <div class="modal-balance-box">
+                <div class="modal-bal-lbl">Total Mined $SUTRA (Fixed: 1B)</div>
+                <div class="modal-bal-val" id="modalTokenBal">0.000</div>
+            </div>
+            <div class="sst-status-box">
+                🪙 <b>$SST Coin</b> (Rate: 1000 SUTRA = 1 SST)<br>Coming Soon (Mainnet Launch & Listing)
+            </div>
+            <button class="modal-btn" onclick="comingSoon()" id="withdrawBtn">🔒 Withdraw (Coming Soon)</button>
+            <button class="close-modal" onclick="toggleModal('walletModal', false)">Close Window</button>
+        </div>
+    </div>
+
+    <!-- LANGUAGE MODAL -->
+    <div id="languageModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">🌐 Select Language</div>
+
+            <button class="modal-btn" onclick="setLanguage('English')">
+                🇺🇸 English
+            </button>
+
+            <button class="modal-btn" onclick="setLanguage('Hindi')">
+                🇮🇳 हिन्दी
+            </button>
+
+            <button class="modal-btn" onclick="setLanguage('Japanese')">
+                🇯🇵 Japanese
+            </button>
+
+            <button class="close-modal"
+            onclick="toggleModal('languageModal', false)">
+            Close
+            </button>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION MODAL -->
+    <div id="notificationModal" class="modal-overlay">
+        <div class="modal-content">
+
+            <div class="modal-title">
+                🔔 Notifications
+            </div>
+
+            <div id="notificationList"
+            style="
+            max-height:300px;
+            overflow-y:auto;
+            text-align:left;
+            ">
+            </div>
+
+            <button class="close-modal"
+            onclick="toggleModal('notificationModal', false)">
+            Close
+            </button>
+
+        </div>
+    </div>
+
+    <!-- HISTORY MODAL -->
+    <div id="historyModal" class="modal-overlay">
+        <div class="modal-content">
+
+            <div class="modal-title">
+                📜 Mining History
+            </div>
+
+            <div id="historyList"
+            style="
+            max-height:300px;
+            overflow-y:auto;
+            text-align:left;
+            "></div>
+
+            <button class="close-modal"
+            onclick="toggleModal('historyModal', false)">
+            Close
+            </button>
+
+        </div>
+    </div>
+
+    <!-- ANNOUNCEMENT MODAL -->
+    <div id="announcementModal" class="modal-overlay">
+        <div class="modal-content">
+
+            <div class="modal-title">
+                📢 Announcements
+            </div>
+
+            <div id="announcementList"
+            style="
+            max-height:300px;
+            overflow-y:auto;
+            text-align:left;
+            font-size:13px;
+            ">
+                Loading...
+            </div>
+
+            <button class="close-modal"
+            onclick="toggleModal('announcementModal', false)">
+            Close
+            </button>
+
+        </div>
+    </div>
+
+    <!-- PROFILE MODAL -->
+    <div id="profileModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">✏️ Edit Profile</div>
+            <div class="input-group">
+                <label>Your Name</label>
+                <input type="text" id="nameInput" placeholder="Enter your name">
+            </div>
+            <div class="input-group">
+                <label>Profile Picture URL</label>
+                <input type="text" id="picInput" placeholder="Paste image link here">
+            </div>
+            <button class="modal-btn" onclick="saveProfile()">Save Profile</button>
+            
+            <button class="modal-btn"
+            style="background:#dc2626;"
+            onclick="logoutUser()">
+            🚪 Logout
+            </button>
+
+            <button class="close-modal" onclick="toggleModal('profileModal', false)">Cancel</button>
+        </div>
+    </div>
+
+    <!-- GOOGLE LOGIN BOX -->
+    <div id="loginBox" style="
+    background:#111827;
+    padding:15px;
+    border-radius:12px;
+    margin-bottom:15px;
+    width:100%;
+    ">
+        <button id="googleLoginBtn"
+        style="
+        width:100%;
+        padding:12px;
+        border:none;
+        border-radius:10px;
+        background:#2563eb;
+        color:white;
+        font-weight:bold;
+        cursor:pointer;
+        ">
+        Google Sign In
+        </button>
+    </div>
+
+    <!-- TOP HEADER BAR -->
+    <div class="top-bar">
+        <!-- Profile & Global Token Meter -->
+        <div class="profile-box" onclick="toggleModal('profileModal', true)">
+            <div class="profile-pic" id="uPicContainer">
+                <span id="uPicText">S</span>
+            </div>
+            <div class="profile-info">
+                <div class="profile-name" id="uName">Miner</div>
+                <div class="meter-title">Global Mined (1 Billion)</div>
+                <div class="meter-text" id="globalMinedText">0.00%</div>
+                <div class="progress-bg">
+                    <div class="progress-fill" id="globalProgressFill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Wallet, Language & Alerts Group -->
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+            <!-- Wallet & Global Users/Referrals -->
+            <button class="wallet-btn" onclick="toggleModal('walletModal', true)" style="max-width: 100%;">
+                <div class="wallet-title">💳 Wallet</div>
+                <div class="wallet-sub" id="globalUsersText">🌐 0 Joined<br>🟢 0 Online<br>👥 My Refs: 0</div>
+            </button>
+            
+            <!-- Language Button -->
+            <button class="wallet-btn" onclick="toggleModal('languageModal', true)" style="max-width: 100%;">
+                <div class="wallet-title">🌐 Language</div>
+                <div class="wallet-sub" id="currentLanguage">English</div>
+            </button>
+            
+            <!-- Alerts Button -->
+            <button class="wallet-btn" onclick="toggleModal('notificationModal', true)" style="max-width: 100%;">
+                <div class="wallet-title">🔔 Alerts</div>
+                <div class="wallet-sub" id="alertCount">0 New</div>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN BALANCE -->
+    <div class="balance-card">
+        <div class="balance-title">My Total Mined $SUTRA</div>
+        <div class="balance-amount" id="tokenBalance">0.000</div>
+    </div>
+
+    <div class="ref-card">
+        <h3>🏅 My Rank</h3>
+        <div id="rankBox">🪨 New Miner</div>
+    </div>
+
+    <!-- MINING BUTTON -->
+    <div class="mine-container">
+        <button class="mine-btn" id="mineBtn" onclick="startMiningProcess()">
+            <div class="mine-icon">▶️</div>
+            <div class="mine-text" id="mineText">Play / Start</div>
+            <div class="mine-time" id="mineSubText">Watch Ad to Mine</div>
+        </button>
+    </div>
+
+    <!-- LIVE BOOSTER SYSTEM -->
+    <div class="booster-card">
+        <div class="booster-title" id="boosterTitle">🚀 2x Mining Booster (500 SUTRA / 4h)</div>
+        <button class="booster-btn" id="boostBtn" onclick="handleBooster()">⚡ Watch Ad (Activate 2x)</button>
+    </div>
+
+    <!-- REFERRAL & SOCIAL SHARE -->
+    <div class="ref-card">
+        <h3>👥 Referral & Social Share</h3>
+        <div class="ref-desc">Invite friends and get <b>500 $SUTRA</b> bonus instantly!</div>
+        <div class="social-grid">
+            <button class="s-btn btn-main-share" onclick="nativeShare()">📤 Invite Friends (Share via Apps)</button>
+            <a id="waShare" class="s-btn btn-wa" target="_blank">WhatsApp</a>
+            <a id="tgShare" class="s-btn btn-tg" target="_blank">Telegram</a>
+            <a id="fbShare" class="s-btn btn-fb" target="_blank">Facebook</a>
+            <a id="xShare"  class="s-btn btn-x"  target="_blank">X (Twitter)</a>
+        </div>
+    </div>
+
+    <!-- DAILY REWARD CARD -->
+    <div class="ref-card">
+        <h3>🎁 Daily Reward</h3>
+        <div class="ref-desc">
+            Claim 100 SUTRA every day.
+        </div>
+        <button class="s-btn btn-main-share"
+        onclick="claimDailyReward()">
+        Claim Reward
+        </button>
+    </div>
+
+    <!-- SUPPORT CENTER CARD -->
+    <div class="ref-card">
+        <h3>🛠 Support Center</h3>
+        <div class="ref-desc">
+            Need help? Contact our support team.
+        </div>
+
+        <button class="s-btn btn-tg"
+        onclick="openSupport()"
+        style="width:100%;">
+        💬 Telegram Support
+        </button>
+    </div>
+
+    <!-- ANNOUNCEMENT CARD -->
+    <div class="ref-card">
+        <h3>📢 Announcements</h3>
+        <div class="ref-desc">
+            Latest updates, listing news and system announcements.
+        </div>
+
+        <button class="s-btn btn-main-share"
+        onclick="toggleModal('announcementModal', true)">
+        📢 Open Announcements
+        </button>
+    </div>
+
+    <!-- NOTIFICATION HISTORY CARD -->
+    <div class="ref-card">
+        <h3>🔔 Notifications</h3>
+        <div class="ref-desc">
+            View mining, booster and referral history.
+        </div>
+
+        <button class="s-btn btn-main-share"
+        onclick="toggleModal('notificationModal', true)">
+        🔔 Open Notifications
+        </button>
+    </div>
+
+    <div class="ref-card">
+        <h3>📜 Mining History</h3>
+        <div class="ref-desc">
+            View all mining activities.
+        </div>
+        <button class="s-btn btn-main-share"
+        onclick="toggleModal('historyModal', true)">
+        Open History
+        </button>
+    </div>
+
+    <!-- TOP MINERS LEADERBOARD CARD -->
+    <div class="ref-card">
+        <h3>🏆 Top Miners</h3>
+        <div id="leaderboardList" style="font-size: 13px; color: #9ca3af; margin-top: 8px;">
+            Loading...
+        </div>
+    </div>
+
+    <script>
+        // TELEGRAM INIT
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.expand(); tg.ready(); }
+        const user = tg?.initDataUnsafe?.user;
+        
+        const telegramId = user?.id || (window.auth && window.auth.currentUser?.uid) || "guest";
+        const telegramUsername = user?.username || "";
+        const telegramFirstName = user?.first_name || "";
+
+        function getUserId() {
+            return String(
+                user?.id ||
+                window.auth?.currentUser?.uid ||
+                ""
+            );
+        }
+        
+        // PROFILE LOGIC (Global scope for module access)
+        window.savedName = localStorage.getItem('sst_custom_name') || (user ? user.first_name : "Miner");
+        window.savedPic = localStorage.getItem('sst_custom_pic') || "";
+
+        window.renderProfile = function() {
+            document.getElementById('uName').innerText = window.savedName;
+            const picContainer = document.getElementById('uPicContainer');
+            if (window.savedPic) {
+                picContainer.innerHTML = `<img src="${window.savedPic}" alt="Profile">`;
+            } else {
+                picContainer.innerHTML = `<span id="uPicText">${window.savedName.charAt(0).toUpperCase()}</span>`;
+            }
+        }
+        window.renderProfile();
+
+        // REFERRAL BONUS LOGIC & GLOBAL VARIABLES
+        const urlParams = new URLSearchParams(window.location.search);
+        const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('start');
+        
+        let balance = 0;
+        let referralCount = 0;
+        let onlineUsers = 0;
+        let notifications = JSON.parse(localStorage.getItem("sst_notifications")) || [];
+        let miningHistory = JSON.parse(localStorage.getItem("sst_history")) || [];
+
+        (async () => {
+            const userId = getUserId();
+            if(!userId) return;
+
+            const data = await window.loadUserData(userId);
+
+            if (data) {
+                balance = data.balance || 0;
+                referralCount = data.referralCount || 0;
+                boostLevel = data.boostLevel || 0;
+                miningStartTime = data.miningStartTime || 0;
+            }
+
+            if (data) {
+                if (data.name) window.savedName = data.name;
+                if (data.photo) window.savedPic = data.photo;
+
+                window.renderProfile();
+            }
+        })();
+
+        function saveProfile() {
+            const n = document.getElementById('nameInput').value.trim();
+            const p = document.getElementById('picInput').value.trim();
+
+            if(
+                p &&
+                !p.startsWith("https://")
+            ){
+                alert("Invalid Image URL");
+                return;
+            }
+
+            if (n) { window.savedName = n; localStorage.setItem('sst_custom_name', n); }
+            if (p) { window.savedPic = p; localStorage.setItem('sst_custom_pic', p); }
+            window.renderProfile();
+            toggleModal('profileModal', false);
+
+            const userId = getUserId();
+            if(!userId){
+                alert("Please Login First");
+                return;
+            }
+
+            try {
+                window.saveUserData(userId, {
+                    name: window.savedName,
+                    photo: window.savedPic,
+                    device: navigator.userAgent,
+                    lastSeen: Date.now(),
+                    online: true,
+                    version: 1
+                });
+            } catch(err) {
+                console.log("Save Error:", err);
+            }
+        }
+
+        if (startParam && startParam.startsWith('ref_') && !localStorage.getItem('sst_ref_claimed')) {
+            balance += 500;
+            referralCount += 1;
+            localStorage.setItem('sst_bal', balance);
+            localStorage.setItem('sst_ref_count', referralCount);
+            localStorage.setItem('sst_ref_claimed', 'true');
+            
+            const referrerId = startParam.replace('ref_', '');
+            const userId = getUserId();
+            if(!userId){
+                alert("Please Login First");
+                return;
+            }
+            
+            try {
+                window.saveUserData(userId, {
+                   referredBy: referrerId
+                });
+            } catch(err) {
+                console.log("Save Error:", err);
+            }
+
+            // Updating the referrer's data safely using async wrapper
+            (async () => {
+                try {
+                    const refDoc = await window.loadUserData(referrerId);
+                    if(refDoc){
+                        let oldBalance = refDoc.balance || 0;
+                        let oldRefs = refDoc.referralCount || 0;
+
+                        await window.saveUserData(referrerId,{
+                            balance: oldBalance + 500,
+                            referralCount: oldRefs + 1
+                        });
+                    }
+                } catch(err) {
+                    console.log("Referral reward error:", err);
+                }
+            })();
+
+            alert("🎉 Congratulations! You received 500 $SUTRA referral bonus!");
+        }
+
+        // 🌟 REAL GLOBAL METERS (Synced live from Firestore via Leaderboard)
+        const TOTAL_SUPPLY = 1000000000; 
+        let globalMined = 0; 
+        let globalUsers = 0; 
+
+        function updateGlobalMeters() {
+            let percent = (globalMined / TOTAL_SUPPLY) * 100;
+            let formattedMined = (globalMined / 1000000).toFixed(2); 
+
+            document.getElementById('globalMinedText').innerText = `${formattedMined}M / 1B (${percent.toFixed(3)}%)`;
+            document.getElementById('globalProgressFill').style.width = `${percent}%`;
+            document.getElementById('globalUsersText').innerHTML = `🌐 ${globalUsers.toLocaleString()} Joined<br>🟢 ${onlineUsers} Online<br>👥 My Refs: ${referralCount}`;
+        }
+        setInterval(updateGlobalMeters, 2000); 
+
+        // MINING LIMITS & RATES (Fixed professionally)
+        const DURATION_24H = 24 * 60 * 60 * 1000;
+        const DURATION_4H = 4 * 60 * 60 * 1000;
+        
+        // Exact 2000 Tokens strictly in 24 Hours Base Limit
+        const BASE_RATE = 2000 / (24 * 60 * 60); 
+
+        // Progressive Booster Rates over 4 Hours
+        const BOOST_RATE_2X = 500 / (4 * 60 * 60);
+        const BOOST_RATE_3X = 1000 / (4 * 60 * 60);
+        const BOOST_RATE_4X = 1500 / (4 * 60 * 60);
+
+        let lastCalcTime = parseInt(localStorage.getItem('sst_last_calc')) || Date.now();
+        let miningStartTime = parseInt(localStorage.getItem('sst_mine_start')) || 0;
+        
+        let boostLevel = parseInt(localStorage.getItem('sst_boost_lvl')) || 0;
+        let boostStartTime = parseInt(localStorage.getItem('sst_boost_start')) || 0;
+
+        let saveCounter = 0;
+
+        // --- FUNCTIONS ---
+        function dailyReward(){
+            let today = new Date().toDateString();
+            let last = localStorage.getItem("sst_daily_reward");
+
+            if(last !== today){
+                balance += 100;
+                localStorage.setItem("sst_daily_reward", today);
+                addNotification("🎁 Daily Reward Claimed");
+            }
+        }
+
+        function claimDailyReward(){
+
+            let today =
+            new Date().toDateString();
+
+            let last =
+            localStorage.getItem(
+            "sst_daily_reward_claim"
+            );
+
+            if(last===today){
+
+            alert(
+            "Already Claimed Today"
+            );
+
+            return;
+            }
+
+            balance += 100;
+
+            localStorage.setItem(
+            "sst_daily_reward_claim",
+            today
+            );
+
+            addNotification(
+            "🎁 Daily Reward Claimed"
+            );
+
+            addHistory(
+            "🎁 Daily Reward Claimed"
+            );
+
+        }
+
+        function comingSoon(){
+            alert(
+            "Withdraw Available After Listing"
+            );
+        }
+
+        function formatTime(ms) {
+            let h = Math.floor(ms / (1000*60*60));
+            let m = Math.floor((ms % (1000*60*60)) / (1000*60));
+            let s = Math.floor((ms % (1000*60)) / 1000);
+            return `${h}h ${m}m ${s}s`;
+        }
+
+        function getRank(balance){
+            if(balance >= 1000000) return "👑 Legend Miner";
+            if(balance >= 500000) return "💎 Diamond Miner";
+            if(balance >= 100000) return "🥇 Gold Miner";
+            if(balance >= 50000) return "🥈 Silver Miner";
+            if(balance >= 10000) return "🥉 Bronze Miner";
+            return "🪨 New Miner";
+        }
+
+        function calculateEarnings() {
+            if(globalMined >= TOTAL_SUPPLY){
+                miningStartTime = 0;
+                document.getElementById("mineBtn").disabled = true;
+                return;
+            }
+
+            let now = Date.now();
+            let deltaSec = (now - lastCalcTime) / 1000;
+            
+            let isMiningActive = (now - miningStartTime) < DURATION_24H && miningStartTime > 0;
+            let isBoostActive = boostLevel > 0 && (now - boostStartTime) < DURATION_4H;
+
+            if (isMiningActive) {
+                let currentRate = BASE_RATE;
+                
+                if (isBoostActive) {
+                    if (boostLevel === 1) currentRate += BOOST_RATE_2X;
+                    else if (boostLevel === 2) currentRate += BOOST_RATE_3X;
+                    else if (boostLevel === 3) currentRate += BOOST_RATE_4X;
+                }
+                balance += (deltaSec * currentRate);
+            } 
+            
+            // Check Expirations
+            if (now - miningStartTime >= DURATION_24H && miningStartTime > 0) {
+                miningStartTime = 0;
+                localStorage.setItem('sst_mine_start', 0);
+                alert("⛏️ Mining Completed!\n\nStart New Mining Session");
+                addNotification("✅ Mining Completed");
+                addHistory("✅ Mining Completed");
+            }
+            if (boostLevel > 0 && now - boostStartTime >= DURATION_4H) {
+                boostLevel = 0;
+                localStorage.setItem('sst_boost_lvl', 0);
+                alert("🚀 Booster Expired!\n\nWatch Ad Again To Reactivate");
+                addNotification("⌛ Booster Expired");
+                addHistory("⌛ Booster Expired");
+            }
+
+            lastCalcTime = now;
+            localStorage.setItem('sst_bal', balance);
+            localStorage.setItem('sst_last_calc', lastCalcTime);
+
+            const userId = getUserId();
+            if(!userId){
+                return;
+            }
+            
+            saveCounter++;
+            if (saveCounter >= 60) {
+                saveCounter = 0;
+                if (typeof window.saveUserData === "function") {
+                    const userId = getUserId();
+                    if(!userId){
+                        return;
+                    }
+                    try {
+                        window.saveUserData(userId, {
+                            balance: balance,
+                            name: window.savedName,
+                            photo: window.savedPic,
+                            device: navigator.userAgent,
+                            lastSeen: Date.now(),
+                            online: true,
+                            version: 1,
+                            referralCount: referralCount,
+                            boostLevel: boostLevel,
+                            miningStartTime: miningStartTime,
+                            lastUpdated: Date.now()
+                        });
+                    } catch(err) {
+                        console.log("Save Error:", err);
+                    }
+                }
+            }
+
+            updateUI(now, isMiningActive, isBoostActive);
+        }
+
+        function updateUI(now, isMiningActive, isBoostActive) {
+            document.getElementById('tokenBalance').innerText = balance.toFixed(3);
+            document.getElementById('modalTokenBal').innerText = balance.toFixed(3);
+            document.getElementById("rankBox").innerText = getRank(balance);
+
+            if(globalMined >= TOTAL_SUPPLY){
+                document.getElementById("mineText").innerText = "Mining Ended";
+                document.getElementById("mineSubText").innerText = "Total Supply Mined";
+            }
+
+            const mBtn = document.getElementById('mineBtn');
+            const mText = document.getElementById('mineText');
+            const mSubText = document.getElementById('mineSubText');
+
+            if (isMiningActive) {
+                mBtn.disabled = true;
+                mText.innerText = "⛏️ Mining...";
+                let timeLeft = DURATION_24H - (now - miningStartTime);
+                mSubText.innerText = formatTime(timeLeft) + " left";
+            } else if (globalMined < TOTAL_SUPPLY) {
+                mBtn.disabled = false;
+                mBtn.classList.remove('disabled');
+                mText.innerText = "▶️ Play / Start";
+                mSubText.innerText = "Watch Ad to Mine";
+            }
+
+            const bTitle = document.getElementById('boosterTitle');
+            const bBtn = document.getElementById('boostBtn');
+            let bLeft = DURATION_4H - (now - boostStartTime);
+
+            if (boostLevel === 0) {
+                bTitle.innerText = "🚀 2x Mining Booster (500 SUTRA / 4h)";
+                bBtn.innerText = "⚡ Watch Ad (Activate 2x)";
+            } else if (boostLevel === 1) {
+                bTitle.innerText = "🚀 3x Mining Booster (1000 SUTRA / 4h)";
+                bBtn.innerText = `⚡ Watch Ad (Upgrade to 3x) - ${formatTime(bLeft)}`;
+            } else if (boostLevel === 2) {
+                bTitle.innerText = "🚀 4x Mining Booster (1500 SUTRA / 4h)";
+                bBtn.innerText = `⚡ Watch Ad (Upgrade to 4x) - ${formatTime(bLeft)}`;
+            } else if (boostLevel === 3) {
+                bTitle.innerText = "🔥 Max 4x Booster Active (1500 SUTRA / 4h)";
+                bBtn.innerText = `🔥 Active (${formatTime(bLeft)} left)`;
+            }
+        }
+
+        // AD WATCH SIMULATION
+        function showAd(callback) {
+            const overlay = document.getElementById('adOverlay');
+            const timerEl = document.getElementById('adTimerNumber');
+            let timeLeft = 15;
+            
+            overlay.style.display = 'flex';
+            timerEl.innerText = timeLeft;
+
+            let adInterval = setInterval(() => {
+                timeLeft--;
+                timerEl.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(adInterval);
+                    overlay.style.display = 'none';
+                    callback();
+                }
+            }, 1000);
+        }
+
+        function startMiningProcess() {
+            if(balance >= 1000000000){
+                alert(
+                "Mining Limit Reached"
+                );
+                return;
+            }
+
+            const userId = getUserId();
+            if(!userId){
+                alert("Please Login First");
+                return;
+            }
+
+            if (!window.auth || !window.auth.currentUser || window.auth.currentUser.isAnonymous) {
+                alert("Please Sign In with Google First");
+                return;
+            }
+
+            if (miningStartTime > 0 && Date.now() - miningStartTime < DURATION_24H) return;
+
+            showAd(() => {
+                miningStartTime = Date.now();
+                lastCalcTime = Date.now();
+                localStorage.setItem('sst_mine_start', miningStartTime);
+                alert("✅ Mining started successfully! Rate: 2000 SUTRA / 24h.");
+                addNotification("⛏️ Mining session started");
+                addHistory("⛏️ Mining Started");
+            });
+        }
+
+        function handleBooster() {
+            const userId = getUserId();
+            if(!userId){
+                alert("Please Login First");
+                return;
+            }
+
+            if (boostLevel === 3) {
+                alert("Your Max (4x) boost is already active!");
+                return;
+            }
+            showAd(() => {
+                boostLevel++;
+                boostStartTime = Date.now();
+                localStorage.setItem('sst_boost_lvl', boostLevel);
+                localStorage.setItem('sst_boost_start', boostStartTime);
+                
+                let bonusAmount = boostLevel === 1 ? 500 : (boostLevel === 2 ? 1000 : 1500);
+                let multiplier = boostLevel + 1; 
+                alert(`🔥 ${multiplier}x Booster activated!`);
+                addNotification(`🚀 ${multiplier}x Booster Activated`);
+                addHistory("🚀 Booster Activated");
+            });
+        }
+
+        // --- NOTIFICATION SYSTEM LOGIC ---
+        function addNotification(message) {
+            notifications.unshift({
+                msg: message,
+                time: new Date().toLocaleString()
+            });
+
+            if(notifications.length > 50){
+                notifications.pop();
+            }
+
+            localStorage.setItem(
+                "sst_notifications",
+                JSON.stringify(notifications)
+            );
+
+            renderNotifications();
+        }
+
+        function renderNotifications() {
+            document.getElementById("alertCount").innerText = notifications.length + " Alerts";
+
+            let html = "";
+
+            notifications.forEach(n => {
+                html += `
+                <div style="
+                padding:10px;
+                border-bottom:1px solid #374151;
+                ">
+                    <b>${n.time}</b><br>
+                    ${n.msg || n.text}
+                </div>
+                `;
+            });
+
+            document.getElementById("notificationList").innerHTML = html || "No notifications";
+        }
+
+        function renderHistory(){
+
+            let html="";
+
+            miningHistory.forEach(item=>{
+
+            html += `
+            <div style="
+            padding:10px;
+            border-bottom:1px solid #374151;
+            ">
+            <b>${item.time}</b><br>
+            ${item.msg}
+            </div>
+            `;
+
+            });
+
+            document.getElementById(
+            "historyList"
+            ).innerHTML =
+            html || "No History";
+
+        }
+
+        function addHistory(text){
+            miningHistory.unshift({
+                msg: text,
+                time: new Date().toLocaleString()
+            });
+
+            if(miningHistory.length > 100){
+                miningHistory.pop();
+            }
+
+            localStorage.setItem(
+                "sst_history",
+                JSON.stringify(miningHistory)
+            );
+
+            renderHistory();
+        }
+
+        function toggleModal(modalId, show) {
+            document.getElementById(modalId).style.display = show ? 'flex' : 'none';
+            if(modalId === 'profileModal' && show) {
+                document.getElementById('nameInput').value = window.savedName;
+                document.getElementById('picInput').value = window.savedPic;
+            }
+        }
+
+        async function loadLeaderboard() {
+            try {
+                const querySnapshot = await getDocs(
+                    collection(window.db, "users")
+                );
+                globalUsers = querySnapshot.size;
+
+                let users = [];
+                let totalMined = 0;
+                onlineUsers = 0;
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    totalMined += data.balance || 0;
+                    
+                    if(
+                        data.online &&
+                        (Date.now() - data.lastSeen) < 60000
+                    ){
+                        onlineUsers++;
+                    }
+
+                    const rawName = data.name || "Miner";
+                    const maskedName = rawName.substring(0, 3) + "***";
+
+                    users.push({
+                        name: maskedName,
+                        balance: data.balance || 0
+                    });
+                });
+
+                globalMined = totalMined;
+
+                users.sort((a,b) => b.balance - a.balance);
+
+                let html = "";
+
+                users.slice(0,10).forEach((u,index) => {
+                    html += `
+                    <div style="
+                    display:flex;
+                    justify-content:space-between;
+                    padding:6px 0;
+                    border-bottom:1px solid #374151;
+                    ">
+                        <span>#${index+1} ${u.name}</span>
+                        <span>${u.balance.toFixed(0)} SUTRA</span>
+                    </div>
+                    `;
+                });
+
+                document.getElementById("leaderboardList").innerHTML =
+                    html || "No Users Found";
+
+            } catch(err) {
+                console.log(err);
+                document.getElementById("leaderboardList").innerHTML =
+                    "Leaderboard Load Failed";
+            }
+        }
+
+        async function loadAnnouncements() {
+            try {
+                const data = [
+                    {
+                        title: "Welcome",
+                        msg: "Welcome to Sutra Mining Ecosystem."
+                    },
+                    {
+                        title: "Mining Update",
+                        msg: "24 Hour Mining System Activated."
+                    },
+                    {
+                        title: "Withdraw",
+                        msg: "Withdraw Feature Coming Soon."
+                    }
+                ];
+
+                let html = "";
+
+                data.forEach(item => {
+                    html += `
+                    <div style="
+                    padding:10px;
+                    border-bottom:1px solid #374151;
+                    margin-bottom:8px;
+                    ">
+                        <b>${item.title}</b><br>
+                        ${item.msg}
+                    </div>
+                    `;
+                });
+
+                document.getElementById("announcementList").innerHTML = html;
+
+            } catch(err) {
+                document.getElementById("announcementList").innerHTML =
+                "Announcements unavailable";
+            }
+        }
+
+        // Initialize UI
+        renderNotifications();
+        renderHistory();
+        dailyReward();
+
+        setInterval(async () => {
+
+            const userId = getUserId();
+
+            if(
+                userId &&
+                window.auth &&
+                window.auth.currentUser
+            ){
+
+                try{
+
+                    await window.saveUserData(
+                        userId,
+                        {
+                            online:true,
+                            lastSeen:Date.now()
+                        }
+                    );
+
+                }catch(err){
+                    console.log(err);
+                }
+            }
+
+        },30000);
+
+        window.addEventListener("beforeunload", async () => {
+            try {
+                const userId = getUserId();
+
+                if(userId){
+                    await window.saveUserData(userId,{
+                        online:false,
+                        lastSeen:Date.now()
+                    });
+                }
+            } catch(err){
+                console.log(err);
+            }
+        });
+
+        window.logoutUser = async function() {
+            try {
+                const userId = getUserId();
+                if(!userId){
+                    alert("Please Login First");
+                    return;
+                }
+                try {
+                    await window.saveUserData(
+                        userId,
+                        {
+                            online: false,
+                            lastSeen: Date.now()
+                        }
+                    );
+                } catch(err) {
+                    console.log("Save Error:", err);
+                }
+                await window.auth.signOut();
+                alert("Logged Out Successfully");
+                location.reload();
+            } catch(err) {
+                console.log(err);
+                alert(err.message);
+            }
+        }
+
+        // START CALCULATING EVERY SECOND & LOAD/AUTO-UPDATE LEADERBOARD
+        setInterval(calculateEarnings, 1000);
+        loadLeaderboard();
+        loadAnnouncements();
+        setInterval(loadLeaderboard, 60000);
+
+        // NATIVE SHARE & SOCIAL LINKS
+        const supportLink = "https://t.me/SutraSupport";
+        const refLink = `https://t.me/SutraTokenBot?start=ref_${user?.id || 'miner'}`;
+        const shareText = `🚀 Join Sutra Token Mining App and get 500 $SUTRA bonus instantly!\n\nJoin here: ${refLink}`;
+
+        function nativeShare() {
+            if (navigator.share) {
+                navigator.share({ title: 'Sutra Token Mining', text: shareText, url: refLink }).catch(() => {});
+            } else {
+                if (tg && tg.openTelegramLink) {
+                    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`);
+                } else {
+                    prompt("Copy your referral link:", refLink);
+                }
+            }
+        }
+
+        function openSupport() {
+            if (tg && tg.openTelegramLink) {
+                tg.openTelegramLink(supportLink);
+            } else {
+                window.open(supportLink, "_blank");
+            }
+        }
+
+        document.getElementById('waShare').href = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+        document.getElementById('tgShare').href = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`;
+        document.getElementById('fbShare').href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(refLink)}`;
+        document.getElementById('xShare').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+        
+        document.getElementById("googleLoginBtn").addEventListener("click", () => {
+            if (typeof window.googleLogin === "function") {
+                window.googleLogin();
+            }
+        });
+
+        // LANGUAGE SYSTEM LOGIC
+        let currentLanguage = localStorage.getItem("sst_language") || "English";
+        document.getElementById("currentLanguage").innerText = currentLanguage;
+
+        function setLanguage(lang) {
+            currentLanguage = lang;
+            localStorage.setItem("sst_language", currentLanguage);
+            document.getElementById("currentLanguage").innerText = currentLanguage;
+            toggleModal("languageModal", false);
+            alert("Language Changed To " + currentLanguage + "\n\nFull Translation Coming Soon");
+        }
+    </script>
+</body>
+</html>
+
