@@ -4,8 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Sutra Token Mining Ecosystem</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Rewarded Ad SDK Here -->
+    
+    <!-- Telegram Environment Restriction -->
+    <script>
+        if(!window.Telegram?.WebApp?.initDataUnsafe?.user){
+            document.body.innerHTML = "<h2 style='color:white;text-align:center;margin-top:50px;'>Please open inside Telegram.</h2>";
+            throw new Error("Unauthorized");
+        }
+    </script>
+
     <!-- Firebase Initialization Script -->
     <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
@@ -16,15 +26,15 @@
       getDoc,
       updateDoc,
       collection,
-      getDocs
+      getDocs,
+      serverTimestamp
     } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
     import {
-      getAuth,
-      GoogleAuthProvider,
-      signInWithPopup,
-      onAuthStateChanged,
-      signOut
-    } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+      getStorage,
+      ref,
+      uploadBytes,
+      getDownloadURL
+    } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyB2FiUai1PLFt1V-KC6E9z3D7xRwCc_JWM",
@@ -38,16 +48,32 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const storage = getStorage(app);
 
     window.db = db;
 
-    const auth = getAuth(app);
-
     console.log("Firebase Connected");
 
-    window.saveUserData = async function(userId, data) {
-        if (!userId) return;
-        await setDoc(doc(db, "users", userId), data, { merge: true });
+    const APP_VERSION = "1.0.0";
+
+    window.saveUserData = async function(userId, data){
+        if(!userId) return;
+
+        try {
+            await setDoc(
+                doc(db, "users", userId),
+                {
+                    ...data,
+                    appVersion: APP_VERSION,
+                    updatedAt: serverTimestamp()
+                },
+                {
+                    merge: true
+                }
+            );
+        } catch(err) {
+            console.error("Firebase Error:", err);
+        }
     }
 
     window.loadUserData = async function(userId) {
@@ -58,81 +84,22 @@
                 return snap.data();
             }
         } catch(err) {
-            console.log("Load Error:", err);
+            console.error("Firebase Error:", err);
         }
         return null;
     }
 
-    window.auth = auth;
-
-    onAuthStateChanged(auth, (user) => {
-        if(user){
-            document.getElementById("loginBox").style.display = "none";
-
-            // Online & Last Seen Update
-            const userId = getUserId();
-            if(!userId){
-                alert("Please Login First");
-                return;
-            }
-            try {
-                window.saveUserData(userId, {
-                    online: true,
-                    lastSeen: Date.now(),
-                    version: 1
-                });
-            } catch(err) {
-                console.log("Save Error:", err);
-            }
-
-            if(user.displayName){
-                window.savedName = user.displayName;
-            }
-            if(user.photoURL){
-                window.savedPic = user.photoURL;
-            }
-            
-            // Calling the global render function
-            if (typeof window.renderProfile === "function") {
-                window.renderProfile();
-            }
-        } else {
-            document.getElementById("loginBox").style.display = "block";
-        }
-    });
-
-    const provider = new GoogleAuthProvider();
-
-    window.googleLogin = async function () {
+    // Firebase Storage Upload Function
+    window.uploadProfileImage = async function(userId, file) {
+        if (!file || !userId) return null;
         try {
-            const result = await signInWithPopup(auth, provider);
-            const user = result.user;
-
-            const userId = getUserId();
-            if(!userId){
-                alert("Please Login First");
-                return;
-            }
-
-            try {
-                await window.saveUserData(userId, {
-                    name: user.displayName,
-                    email: user.email,
-                    photo: user.photoURL,
-                    device: navigator.userAgent,
-                    lastSeen: Date.now(),
-                    online: true,
-                    version: 1
-                });
-            } catch(err) {
-                console.log("Save Error:", err);
-            }
-
-            alert("Google Login Success");
-            location.reload();
-        } catch(err) {
-            console.log(err);
-            alert(err.message);
+            const fileRef = ref(storage, `profile_pictures/${userId}_${Date.now()}_${file.name}`);
+            const snapshot = await uploadBytes(fileRef, file);
+            const downloadUrl = await getDownloadURL(snapshot.ref);
+            return downloadUrl;
+        } catch (err) {
+            console.error("Firebase Error:", err);
+            throw err;
         }
     }
     </script>
@@ -210,23 +177,34 @@
         .input-group { margin-bottom: 12px; text-align: left; }
         .input-group label { font-size: 11px; color: #9ca3af; display: block; margin-bottom: 4px; }
         .input-group input { width: 100%; padding: 10px; background: #111827; border: 1px solid #374151; border-radius: 8px; color: white; font-size: 14px; outline: none; }
+        .input-group input[type="file"] { padding: 8px; font-size: 12px; background: #1f2937; border: 1px dashed #374151; cursor: pointer;}
         .input-group input:focus { border-color: #38bdf8; }
 
-        .modal-btn { background: #2563eb; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; margin-bottom: 8px; }
+        .modal-btn { background: #2563eb; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; margin-bottom: 8px; transition: 0.2s; }
+        .modal-btn:disabled { background: #4b5563; cursor: not-allowed; }
         .close-modal { background: #ef4444; color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
-
-        /* Full Screen Ad Overlay */
-        #adOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000ed; z-index: 3000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
-        .ad-text { font-size: 20px; font-weight: bold; color: white; margin-bottom: 15px; text-align: center; }
-        .ad-timer { font-size: 65px; font-weight: 900; color: #facc15; text-shadow: 0 0 20px rgba(250, 204, 21, 0.5); }
     </style>
 </head>
 <body>
 
-    <!-- AD SCREEN OVERLAY -->
-    <div id="adOverlay">
-        <div class="ad-text">Sponsor Ad Running...<br><small style="font-size: 14px; color: #9ca3af; font-weight: normal;">Please wait to unlock reward</small></div>
-        <div class="ad-timer" id="adTimerNumber">15</div>
+    <!-- Legal & Transparency Notice -->
+    <div style="
+    background:#111827;
+    border:1px solid #374151;
+    padding:12px;
+    border-radius:12px;
+    margin-bottom:15px;
+    font-size:12px;
+    line-height:1.6;
+    color:#d1d5db;
+    ">
+    🔞 This platform is intended for users aged 18 years and above only.<br><br>
+    🎁 SUTRA is currently a reward-based ecosystem participation system.<br><br>
+    ⛏️ Mining rewards are distributed according to platform rules and participation activity.<br><br>
+    📢 Future token utility, ecosystem features, exchange availability, or listings may be introduced if the project develops accordingly.<br><br>
+    ⚠️ No fixed token value, guaranteed profit, guaranteed financial return, guaranteed listing date, or guaranteed market price exists at this time.<br><br>
+    ⚠️ Users should participate responsibly and should not rely on this platform for financial expectations.<br><br>
+    📣 All future developments and updates will be announced through official platform channels.
     </div>
 
     <!-- WALLET MODAL -->
@@ -238,9 +216,11 @@
                 <div class="modal-bal-val" id="modalTokenBal">0.000</div>
             </div>
             <div class="sst-status-box">
-                🪙 <b>$SST Coin</b> (Rate: 1000 SUTRA = 1 SST)<br>Coming Soon (Mainnet Launch & Listing)
+                🪙 <b>SUTRA Reward Points</b><br><br>
+                Future ecosystem utilities, token features, conversion methods, or listings may be introduced based on project development.<br><br>
+                No fixed value, guaranteed price, guaranteed listing date, or guaranteed financial return exists at this time.
             </div>
-            <button class="modal-btn" onclick="comingSoon()" id="withdrawBtn">🔒 Withdraw (Coming Soon)</button>
+            <button class="modal-btn" onclick="comingSoon()" id="withdrawBtn">🔒 Feature Under Development</button>
             <button class="close-modal" onclick="toggleModal('walletModal', false)">Close Window</button>
         </div>
     </div>
@@ -326,7 +306,7 @@
 
             <div id="announcementList"
             style="
-            max-height:300px;
+            max-height:350px;
             overflow-y:auto;
             text-align:left;
             font-size:13px;
@@ -350,43 +330,18 @@
                 <label>Your Name</label>
                 <input type="text" id="nameInput" placeholder="Enter your name">
             </div>
-            <div class="input-group">
-                <label>Profile Picture URL</label>
-                <input type="text" id="picInput" placeholder="Paste image link here">
-            </div>
-            <button class="modal-btn" onclick="saveProfile()">Save Profile</button>
             
-            <button class="modal-btn"
-            style="background:#dc2626;"
-            onclick="logoutUser()">
-            🚪 Logout
-            </button>
+            <div class="input-group">
+                <label>Profile Picture (Optional)</label>
+                <input type="file" id="picUpload" accept="image/png, image/jpeg, image/jpg">
+                <div id="uploadStatus" style="font-size: 11px; color: #38bdf8; margin-top: 6px; display: none; font-weight: bold;">
+                    ⏳ Uploading Image... Please wait.
+                </div>
+            </div>
 
+            <button class="modal-btn" id="saveProfileBtn" onclick="saveProfile()">Save Profile</button>
             <button class="close-modal" onclick="toggleModal('profileModal', false)">Cancel</button>
         </div>
-    </div>
-
-    <!-- GOOGLE LOGIN BOX -->
-    <div id="loginBox" style="
-    background:#111827;
-    padding:15px;
-    border-radius:12px;
-    margin-bottom:15px;
-    width:100%;
-    ">
-        <button id="googleLoginBtn"
-        style="
-        width:100%;
-        padding:12px;
-        border:none;
-        border-radius:10px;
-        background:#2563eb;
-        color:white;
-        font-weight:bold;
-        cursor:pointer;
-        ">
-        Google Sign In
-        </button>
     </div>
 
     <!-- TOP HEADER BAR -->
@@ -444,26 +399,37 @@
         <button class="mine-btn" id="mineBtn" onclick="startMiningProcess()">
             <div class="mine-icon">▶️</div>
             <div class="mine-text" id="mineText">Play / Start</div>
-            <div class="mine-time" id="mineSubText">Watch Ad to Mine</div>
+            <div class="mine-time" id="mineSubText">Tap to Mine</div>
         </button>
     </div>
 
     <!-- LIVE BOOSTER SYSTEM -->
     <div class="booster-card">
         <div class="booster-title" id="boosterTitle">🚀 2x Mining Booster (500 SUTRA / 4h)</div>
-        <button class="booster-btn" id="boostBtn" onclick="handleBooster()">⚡ Watch Ad (Activate 2x)</button>
+        <button class="booster-btn" id="boostBtn" onclick="handleBooster()">⚡ Activate 2x Booster</button>
     </div>
 
     <!-- REFERRAL & SOCIAL SHARE -->
     <div class="ref-card">
-        <h3>👥 Referral & Social Share</h3>
-        <div class="ref-desc">Invite friends and get <b>500 $SUTRA</b> bonus instantly!</div>
+        <h3>👥 Referral Rewards</h3>
+        <div class="ref-desc">
+            Invite friends to join the ecosystem and receive additional SUTRA reward points according to current platform rules.<br><br>
+            Reward values, eligibility requirements, and platform features may be updated over time.
+        </div>
         <div class="social-grid">
             <button class="s-btn btn-main-share" onclick="nativeShare()">📤 Invite Friends (Share via Apps)</button>
             <a id="waShare" class="s-btn btn-wa" target="_blank">WhatsApp</a>
             <a id="tgShare" class="s-btn btn-tg" target="_blank">Telegram</a>
             <a id="fbShare" class="s-btn btn-fb" target="_blank">Facebook</a>
             <a id="xShare"  class="s-btn btn-x"  target="_blank">X (Twitter)</a>
+        </div>
+        <div style="
+        font-size:11px;
+        color:#9ca3af;
+        margin-top:8px;
+        text-align:center;
+        ">
+        Referral rewards are ecosystem participation rewards and do not represent financial returns or guaranteed future value.
         </div>
     </div>
 
@@ -544,20 +510,23 @@
         if (tg) { tg.expand(); tg.ready(); }
         const user = tg?.initDataUnsafe?.user;
         
-        const telegramId = user?.id || (window.auth && window.auth.currentUser?.uid) || "guest";
+        const telegramId = user?.id;
+
+        // Strict Telegram Restriction
+        if(!telegramId){
+            document.body.innerHTML = "<h2 style='color:white;text-align:center;margin-top:50px;'>Open inside Telegram only</h2>";
+            throw new Error("Telegram Required");
+        }
+
         const telegramUsername = user?.username || "";
         const telegramFirstName = user?.first_name || "";
 
         function getUserId() {
-            return String(
-                user?.id ||
-                window.auth?.currentUser?.uid ||
-                ""
-            );
+            return String(user?.id || "");
         }
         
-        // PROFILE LOGIC (Global scope for module access)
-        window.savedName = localStorage.getItem('sst_custom_name') || (user ? user.first_name : "Miner");
+        // PROFILE LOGIC
+        window.savedName = localStorage.getItem('sst_custom_name') || telegramFirstName || "Miner";
         window.savedPic = localStorage.getItem('sst_custom_pic') || "";
 
         window.renderProfile = function() {
@@ -571,15 +540,36 @@
         }
         window.renderProfile();
 
+        // Auto-Save Initial Telegram User Data & Status
+        if(getUserId()) {
+             try {
+                window.saveUserData(getUserId(), {
+                    telegramId: getUserId(),
+                    telegramUsername: telegramUsername,
+                    name: window.savedName,
+                    online: true,
+                    lastHeartbeat: Date.now()
+                });
+             } catch(err) {
+                 console.error("Firebase Error:", err);
+             }
+        }
+
         // REFERRAL BONUS LOGIC & GLOBAL VARIABLES
         const urlParams = new URLSearchParams(window.location.search);
         const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('start');
         
+        // Variables securely stored in memory (Anti-Cheat: Removed from Local Storage)
         let balance = 0;
         let referralCount = 0;
         let onlineUsers = 0;
         let notifications = JSON.parse(localStorage.getItem("sst_notifications")) || [];
         let miningHistory = JSON.parse(localStorage.getItem("sst_history")) || [];
+
+        let lastCalcTime = Date.now();
+        let miningStartTime = 0;
+        let boostLevel = 0;
+        let boostStartTime = 0;
 
         (async () => {
             const userId = getUserId();
@@ -592,6 +582,8 @@
                 referralCount = data.referralCount || 0;
                 boostLevel = data.boostLevel || 0;
                 miningStartTime = data.miningStartTime || 0;
+                boostStartTime = data.boostStartTime || 0;
+                lastCalcTime = data.lastCalcTime || Date.now();
             }
 
             if (data) {
@@ -600,86 +592,129 @@
 
                 window.renderProfile();
             }
+
+            // REFERRAL SYSTEM CHECK LOGIC (Fixed: New user gets balance only, referrer gets count)
+            if (startParam && startParam.startsWith('ref_')) {
+                const referrerId = startParam.replace('ref_', '');
+
+                if(referrerId === userId){
+                    return;
+                }
+
+                const userData = await window.loadUserData(userId);
+
+                if (userData && !userData.referralClaimed) {
+                    balance += 500; // New user gets reward, NOT the referral count
+
+                    try {
+                        await window.saveUserData(userId, {
+                           referredBy: referrerId,
+                           referralClaimed: true,
+                           balance: balance
+                        });
+                    } catch(err) {
+                        console.error("Firebase Error:", err);
+                    }
+
+                    // Updating the referrer's data securely
+                    try {
+                        const refDoc = await window.loadUserData(referrerId);
+                        if(refDoc){
+                            let oldBalance = refDoc.balance || 0;
+                            let oldRefs = refDoc.referralCount || 0;
+
+                            await window.saveUserData(referrerId,{
+                                balance: oldBalance + 500,
+                                referralCount: oldRefs + 1
+                            });
+                        }
+                    } catch(err) {
+                        console.error("Firebase Error:", err);
+                    }
+
+                    alert("🎉 Congratulations! You received 500 SUTRA reward points!");
+                }
+            }
         })();
 
-        function saveProfile() {
+        // UPGRADED SAVE PROFILE WITH IMAGE TYPE & SIZE VALIDATION
+        async function saveProfile() {
+            const userId = getUserId();
+            if(!userId){
+                alert("Telegram User Not Found. Please open inside Telegram.");
+                return;
+            }
+
             const n = document.getElementById('nameInput').value.trim();
-            const p = document.getElementById('picInput').value.trim();
+            const fileInput = document.getElementById('picUpload');
+            const file = fileInput.files[0];
+            const btn = document.getElementById('saveProfileBtn');
+            const status = document.getElementById('uploadStatus');
 
-            if(
-                p &&
-                !p.startsWith("https://")
-            ){
-                alert("Invalid Image URL");
-                return;
-            }
+            const allowedTypes = [
+                'image/jpeg',
+                'image/jpg',
+                'image/png'
+            ];
 
-            if (n) { window.savedName = n; localStorage.setItem('sst_custom_name', n); }
-            if (p) { window.savedPic = p; localStorage.setItem('sst_custom_pic', p); }
-            window.renderProfile();
-            toggleModal('profileModal', false);
-
-            const userId = getUserId();
-            if(!userId){
-                alert("Please Login First");
-                return;
-            }
-
-            try {
-                window.saveUserData(userId, {
-                    name: window.savedName,
-                    photo: window.savedPic,
-                    device: navigator.userAgent,
-                    lastSeen: Date.now(),
-                    online: true,
-                    version: 1
-                });
-            } catch(err) {
-                console.log("Save Error:", err);
-            }
-        }
-
-        if (startParam && startParam.startsWith('ref_') && !localStorage.getItem('sst_ref_claimed')) {
-            balance += 500;
-            referralCount += 1;
-            localStorage.setItem('sst_bal', balance);
-            localStorage.setItem('sst_ref_count', referralCount);
-            localStorage.setItem('sst_ref_claimed', 'true');
-            
-            const referrerId = startParam.replace('ref_', '');
-            const userId = getUserId();
-            if(!userId){
-                alert("Please Login First");
-                return;
-            }
-            
-            try {
-                window.saveUserData(userId, {
-                   referredBy: referrerId
-                });
-            } catch(err) {
-                console.log("Save Error:", err);
-            }
-
-            // Updating the referrer's data safely using async wrapper
-            (async () => {
-                try {
-                    const refDoc = await window.loadUserData(referrerId);
-                    if(refDoc){
-                        let oldBalance = refDoc.balance || 0;
-                        let oldRefs = refDoc.referralCount || 0;
-
-                        await window.saveUserData(referrerId,{
-                            balance: oldBalance + 500,
-                            referralCount: oldRefs + 1
-                        });
-                    }
-                } catch(err) {
-                    console.log("Referral reward error:", err);
+            if(file){
+                if(!allowedTypes.includes(file.type)){
+                    alert("Only JPG PNG allowed");
+                    return;
                 }
-            })();
 
-            alert("🎉 Congratulations! You received 500 $SUTRA referral bonus!");
+                if(file.size > 2 * 1024 * 1024){
+                    alert("Maximum Image Size 2MB");
+                    return;
+                }
+            }
+
+            btn.disabled = true;
+            btn.innerText = "Saving Profile...";
+
+            try {
+                let newPicUrl = window.savedPic;
+
+                // If user selected an image file
+                if (file) {
+                    status.style.display = "block";
+                    
+                    if (typeof window.uploadProfileImage === "function") {
+                        const uploadedUrl = await window.uploadProfileImage(userId, file);
+                        if (uploadedUrl) {
+                            newPicUrl = uploadedUrl;
+                            window.savedPic = newPicUrl;
+                            localStorage.setItem('sst_custom_pic', newPicUrl);
+                        }
+                    } else {
+                        console.error("Storage system not initialized yet.");
+                        alert("Storage connection error. Name saved without image.");
+                    }
+                }
+
+                if (n) { 
+                    window.savedName = n; 
+                    localStorage.setItem('sst_custom_name', n); 
+                }
+
+                window.renderProfile();
+
+                await window.saveUserData(userId, {
+                    name: window.savedName,
+                    photo: window.savedPic
+                });
+
+                alert("Profile Saved Successfully!");
+                toggleModal('profileModal', false);
+            } catch(err) {
+                console.error("Firebase Error:", err);
+                alert("Failed to save profile: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Save Profile";
+                status.style.display = "none";
+                fileInput.value = ""; // Clear file selection
+            }
         }
 
         // 🌟 REAL GLOBAL METERS (Synced live from Firestore via Leaderboard)
@@ -697,7 +732,7 @@
         }
         setInterval(updateGlobalMeters, 2000); 
 
-        // MINING LIMITS & RATES (Fixed professionally)
+        // MINING LIMITS & RATES
         const DURATION_24H = 24 * 60 * 60 * 1000;
         const DURATION_4H = 4 * 60 * 60 * 1000;
         
@@ -709,65 +744,38 @@
         const BOOST_RATE_3X = 1000 / (4 * 60 * 60);
         const BOOST_RATE_4X = 1500 / (4 * 60 * 60);
 
-        let lastCalcTime = parseInt(localStorage.getItem('sst_last_calc')) || Date.now();
-        let miningStartTime = parseInt(localStorage.getItem('sst_mine_start')) || 0;
-        
-        let boostLevel = parseInt(localStorage.getItem('sst_boost_lvl')) || 0;
-        let boostStartTime = parseInt(localStorage.getItem('sst_boost_start')) || 0;
-
         let saveCounter = 0;
 
-        // --- FUNCTIONS ---
-        function dailyReward(){
+        async function claimDailyReward(){
+            const userId = getUserId();
+            if(!userId){
+                alert("Telegram User Not Found. Please open inside Telegram.");
+                return;
+            }
+
             let today = new Date().toDateString();
-            let last = localStorage.getItem("sst_daily_reward");
+            
+            const userData = await window.loadUserData(userId);
 
-            if(last !== today){
+            if(userData && userData.lastDailyReward !== today){
                 balance += 100;
-                localStorage.setItem("sst_daily_reward", today);
+
+                await window.saveUserData(userId, {
+                    balance: balance,
+                    lastDailyReward: today
+                });
+
                 addNotification("🎁 Daily Reward Claimed");
+                addHistory("🎁 Daily Reward Claimed");
+                alert("🎉 Daily Reward Claimed Successfully!");
+            } else {
+                alert("Already Claimed Today");
             }
-        }
-
-        function claimDailyReward(){
-
-            let today =
-            new Date().toDateString();
-
-            let last =
-            localStorage.getItem(
-            "sst_daily_reward_claim"
-            );
-
-            if(last===today){
-
-            alert(
-            "Already Claimed Today"
-            );
-
-            return;
-            }
-
-            balance += 100;
-
-            localStorage.setItem(
-            "sst_daily_reward_claim",
-            today
-            );
-
-            addNotification(
-            "🎁 Daily Reward Claimed"
-            );
-
-            addHistory(
-            "🎁 Daily Reward Claimed"
-            );
-
         }
 
         function comingSoon(){
             alert(
-            "Withdraw Available After Listing"
+            "Withdraw functionality is currently unavailable. Future platform updates will be announced through official channels."
             );
         }
 
@@ -811,55 +819,52 @@
                 balance += (deltaSec * currentRate);
             } 
             
+            // Balance Safety Locks
+            if(balance < 0){
+                balance = 0;
+            }
+
+            if(balance > TOTAL_SUPPLY){
+                balance = TOTAL_SUPPLY;
+            }
+            
             // Check Expirations
             if (now - miningStartTime >= DURATION_24H && miningStartTime > 0) {
                 miningStartTime = 0;
-                localStorage.setItem('sst_mine_start', 0);
                 alert("⛏️ Mining Completed!\n\nStart New Mining Session");
                 addNotification("✅ Mining Completed");
                 addHistory("✅ Mining Completed");
             }
             if (boostLevel > 0 && now - boostStartTime >= DURATION_4H) {
                 boostLevel = 0;
-                localStorage.setItem('sst_boost_lvl', 0);
                 alert("🚀 Booster Expired!\n\nWatch Ad Again To Reactivate");
                 addNotification("⌛ Booster Expired");
                 addHistory("⌛ Booster Expired");
             }
 
             lastCalcTime = now;
-            localStorage.setItem('sst_bal', balance);
-            localStorage.setItem('sst_last_calc', lastCalcTime);
 
             const userId = getUserId();
             if(!userId){
                 return;
             }
             
+            // Background Save to DB every 60 seconds (Anti-Cheat DB Sync)
             saveCounter++;
             if (saveCounter >= 60) {
                 saveCounter = 0;
                 if (typeof window.saveUserData === "function") {
-                    const userId = getUserId();
-                    if(!userId){
-                        return;
-                    }
                     try {
                         window.saveUserData(userId, {
                             balance: balance,
-                            name: window.savedName,
-                            photo: window.savedPic,
-                            device: navigator.userAgent,
-                            lastSeen: Date.now(),
-                            online: true,
-                            version: 1,
                             referralCount: referralCount,
                             boostLevel: boostLevel,
                             miningStartTime: miningStartTime,
-                            lastUpdated: Date.now()
+                            boostStartTime: boostStartTime,
+                            lastCalcTime: lastCalcTime
                         });
                     } catch(err) {
-                        console.log("Save Error:", err);
+                        console.error("Firebase Error:", err);
                     }
                 }
             }
@@ -912,27 +917,32 @@
             }
         }
 
-        // AD WATCH SIMULATION
+        // AD WATCH FUNCTION
         function showAd(callback) {
-            const overlay = document.getElementById('adOverlay');
-            const timerEl = document.getElementById('adTimerNumber');
-            let timeLeft = 15;
-            
-            overlay.style.display = 'flex';
-            timerEl.innerText = timeLeft;
-
-            let adInterval = setInterval(() => {
-                timeLeft--;
-                timerEl.innerText = timeLeft;
-                if (timeLeft <= 0) {
-                    clearInterval(adInterval);
-                    overlay.style.display = 'none';
+            if (typeof window.showRewardedAd === "function") {
+                showRewardedAd().then(()=>{
                     callback();
-                }
-            }, 1000);
+                }).catch((err) => {
+                    console.error("Firebase Error:", err);
+                    alert("Failed to load ad. Please try again.");
+                });
+            } else {
+                alert("Ad Service Unavailable");
+                return;
+            }
         }
 
         function startMiningProcess() {
+            if(!navigator.onLine){
+                alert("Internet Connection Required");
+                return;
+            }
+
+            if(globalMined >= TOTAL_SUPPLY){
+                alert("Total Supply Exhausted");
+                return;
+            }
+
             if(balance >= 1000000000){
                 alert(
                 "Mining Limit Reached"
@@ -942,12 +952,7 @@
 
             const userId = getUserId();
             if(!userId){
-                alert("Please Login First");
-                return;
-            }
-
-            if (!window.auth || !window.auth.currentUser || window.auth.currentUser.isAnonymous) {
-                alert("Please Sign In with Google First");
+                alert("Telegram User Not Found. Please open inside Telegram.");
                 return;
             }
 
@@ -956,17 +961,27 @@
             showAd(() => {
                 miningStartTime = Date.now();
                 lastCalcTime = Date.now();
-                localStorage.setItem('sst_mine_start', miningStartTime);
                 alert("✅ Mining started successfully! Rate: 2000 SUTRA / 24h.");
                 addNotification("⛏️ Mining session started");
                 addHistory("⛏️ Mining Started");
+                
+                // Save immediately to DB
+                window.saveUserData(userId, {
+                    miningStartTime: miningStartTime,
+                    lastCalcTime: lastCalcTime
+                });
             });
         }
 
         function handleBooster() {
+            if(!navigator.onLine){
+                alert("Internet Connection Required");
+                return;
+            }
+
             const userId = getUserId();
             if(!userId){
-                alert("Please Login First");
+                alert("Telegram User Not Found. Please open inside Telegram.");
                 return;
             }
 
@@ -977,14 +992,17 @@
             showAd(() => {
                 boostLevel++;
                 boostStartTime = Date.now();
-                localStorage.setItem('sst_boost_lvl', boostLevel);
-                localStorage.setItem('sst_boost_start', boostStartTime);
                 
-                let bonusAmount = boostLevel === 1 ? 500 : (boostLevel === 2 ? 1000 : 1500);
                 let multiplier = boostLevel + 1; 
                 alert(`🔥 ${multiplier}x Booster activated!`);
                 addNotification(`🚀 ${multiplier}x Booster Activated`);
                 addHistory("🚀 Booster Activated");
+
+                // Save immediately to DB
+                window.saveUserData(userId, {
+                    boostLevel: boostLevel,
+                    boostStartTime: boostStartTime
+                });
             });
         }
 
@@ -995,7 +1013,7 @@
                 time: new Date().toLocaleString()
             });
 
-            if(notifications.length > 50){
+            if(notifications.length > 200){
                 notifications.pop();
             }
 
@@ -1058,7 +1076,7 @@
                 time: new Date().toLocaleString()
             });
 
-            if(miningHistory.length > 100){
+            if(miningHistory.length > 500){
                 miningHistory.pop();
             }
 
@@ -1074,7 +1092,6 @@
             document.getElementById(modalId).style.display = show ? 'flex' : 'none';
             if(modalId === 'profileModal' && show) {
                 document.getElementById('nameInput').value = window.savedName;
-                document.getElementById('picInput').value = window.savedPic;
             }
         }
 
@@ -1093,15 +1110,15 @@
                     const data = doc.data();
                     totalMined += data.balance || 0;
                     
-                    if(
-                        data.online &&
-                        (Date.now() - data.lastSeen) < 60000
-                    ){
+                    const hb = data.lastHeartbeat || data.lastSeen || 0;
+                    if( (Date.now() - hb) < 60000 ){
                         onlineUsers++;
                     }
 
                     const rawName = data.name || "Miner";
-                    const maskedName = rawName.substring(0, 3) + "***";
+                    const maskedName = rawName.length > 3
+                        ? rawName.substring(0, 3) + "***"
+                        : rawName;
 
                     users.push({
                         name: maskedName,
@@ -1133,7 +1150,7 @@
                     html || "No Users Found";
 
             } catch(err) {
-                console.log(err);
+                console.error("Firebase Error:", err);
                 document.getElementById("leaderboardList").innerHTML =
                     "Leaderboard Load Failed";
             }
@@ -1141,128 +1158,99 @@
 
         async function loadAnnouncements() {
             try {
-                const data = [
-                    {
-                        title: "Welcome",
-                        msg: "Welcome to Sutra Mining Ecosystem."
-                    },
-                    {
-                        title: "Mining Update",
-                        msg: "24 Hour Mining System Activated."
-                    },
-                    {
-                        title: "Withdraw",
-                        msg: "Withdraw Feature Coming Soon."
-                    }
-                ];
+                const querySnapshot = await getDocs(
+                    collection(window.db, "announcements")
+                );
+
+                let announcements = [];
+                querySnapshot.forEach((doc) => {
+                    announcements.push(doc.data());
+                });
+
+                if(announcements.length === 0) {
+                     document.getElementById("announcementList").innerHTML = "No announcements currently available.";
+                     return;
+                }
+
+                // Sort by date descending
+                announcements.sort((a, b) => (b.date || 0) - (a.date || 0));
 
                 let html = "";
+                announcements.forEach(item => {
+                    if(item.active !== true) return;
 
-                data.forEach(item => {
                     html += `
                     <div style="
-                    padding:10px;
-                    border-bottom:1px solid #374151;
-                    margin-bottom:8px;
+                    padding:12px;
+                    border: 1px solid #374151;
+                    border-radius: 10px;
+                    background: #1f2937;
+                    margin-bottom:10px;
                     ">
-                        <b>${item.title}</b><br>
-                        ${item.msg}
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                            <b style="color:#38bdf8; font-size:14px;">${item.title || "Announcement"}</b>
+                            <span style="font-size:10px; color:#9ca3af; background:#374151; padding:2px 6px; border-radius:4px;">New</span>
+                        </div>
+                        <div style="color:#d1d5db; font-size:12px; line-height:1.4;">
+                            ${item.message || ""}
+                        </div>
                     </div>
                     `;
                 });
 
-                document.getElementById("announcementList").innerHTML = html;
+                document.getElementById("announcementList").innerHTML = html || "No active announcements.";
 
             } catch(err) {
-                document.getElementById("announcementList").innerHTML =
-                "Announcements unavailable";
+                console.error("Firebase Error:", err);
+                document.getElementById("announcementList").innerHTML = "Announcements unavailable";
             }
         }
 
         // Initialize UI
         renderNotifications();
         renderHistory();
-        dailyReward();
+        loadAnnouncements();
 
+        // 30 Second Heartbeat Ping
         setInterval(async () => {
-
             const userId = getUserId();
-
-            if(
-                userId &&
-                window.auth &&
-                window.auth.currentUser
-            ){
-
+            if(userId){
                 try{
-
-                    await window.saveUserData(
-                        userId,
-                        {
-                            online:true,
-                            lastSeen:Date.now()
-                        }
-                    );
-
+                    await window.saveUserData(userId, {
+                        online: true,
+                        lastHeartbeat: Date.now()
+                    });
                 }catch(err){
-                    console.log(err);
+                    console.error("Firebase Error:", err);
                 }
             }
+        }, 30000);
 
-        },30000);
-
+        // Optional un-load listener
         window.addEventListener("beforeunload", async () => {
             try {
                 const userId = getUserId();
-
                 if(userId){
+                    // Intentionally set to an old timestamp to appear offline immediately
                     await window.saveUserData(userId,{
                         online:false,
-                        lastSeen:Date.now()
+                        lastHeartbeat: 0
                     });
                 }
             } catch(err){
-                console.log(err);
+                console.error("Firebase Error:", err);
             }
         });
-
-        window.logoutUser = async function() {
-            try {
-                const userId = getUserId();
-                if(!userId){
-                    alert("Please Login First");
-                    return;
-                }
-                try {
-                    await window.saveUserData(
-                        userId,
-                        {
-                            online: false,
-                            lastSeen: Date.now()
-                        }
-                    );
-                } catch(err) {
-                    console.log("Save Error:", err);
-                }
-                await window.auth.signOut();
-                alert("Logged Out Successfully");
-                location.reload();
-            } catch(err) {
-                console.log(err);
-                alert(err.message);
-            }
-        }
 
         // START CALCULATING EVERY SECOND & LOAD/AUTO-UPDATE LEADERBOARD
         setInterval(calculateEarnings, 1000);
         loadLeaderboard();
-        loadAnnouncements();
         setInterval(loadLeaderboard, 60000);
 
         // NATIVE SHARE & SOCIAL LINKS
-        const supportLink = "https://t.me/SutraSupport";
-        const refLink = `https://t.me/SutraTokenBot?start=ref_${user?.id || 'miner'}`;
-        const shareText = `🚀 Join Sutra Token Mining App and get 500 $SUTRA bonus instantly!\n\nJoin here: ${refLink}`;
+        const supportLink = "https://t.me/+qBuycU3TidEzMTJl";
+        const refLink = `https://t.me/SutraTokenBot?start=ref_${getUserId()}`;
+        const shareText = `🚀 Join Sutra Token Ecosystem and receive SUTRA reward points!\n\nJoin here: ${refLink}`;
 
         function nativeShare() {
             if (navigator.share) {
@@ -1288,12 +1276,6 @@
         document.getElementById('tgShare').href = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(shareText)}`;
         document.getElementById('fbShare').href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(refLink)}`;
         document.getElementById('xShare').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
-        
-        document.getElementById("googleLoginBtn").addEventListener("click", () => {
-            if (typeof window.googleLogin === "function") {
-                window.googleLogin();
-            }
-        });
 
         // LANGUAGE SYSTEM LOGIC
         let currentLanguage = localStorage.getItem("sst_language") || "English";
@@ -1309,4 +1291,3 @@
     </script>
 </body>
 </html>
-
