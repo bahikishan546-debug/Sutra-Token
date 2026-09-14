@@ -560,8 +560,8 @@ window.googleLogin = async function () {
     }
       
     // PROFILE LOGIC  
-    window.savedName = localStorage.getItem('sst_custom_name') || (user ? user.first_name : "Miner");  
-    window.savedPic = localStorage.getItem('sst_custom_pic') || "";  
+    window.savedName = user ? user.first_name : "Miner";  
+    window.savedPic = "";  
 
     window.renderProfile = function() {  
         document.getElementById('uName').innerText = window.savedName;  
@@ -578,13 +578,19 @@ window.googleLogin = async function () {
     const urlParams = new URLSearchParams(window.location.search);  
     const startParam = tg?.initDataUnsafe?.start_param || urlParams.get('start');  
       
-    let balance = parseFloat(localStorage.getItem('sst_bal')) || 0; 
+    let balance = 0; 
     let sessionEarned = 0; 
-    let totalSessions = parseInt(localStorage.getItem('sst_total_sessions')) || 0; 
+    let totalSessions = 0; 
     let referralCount = 0;  
     let onlineUsers = 0;  
-    let notifications = JSON.parse(localStorage.getItem("sst_notifications")) || [];  
-    let miningHistory = JSON.parse(localStorage.getItem("sst_history")) || [];  
+    let notifications = [];  
+    let miningHistory = [];  
+
+    let lastCalcTime = Date.now();  
+    let miningStartTime = 0;  
+    let boostLevel = 0;  
+    let boostStartTime = 0;  
+    let saveCounter = 0;  
 
     (async () => {  
         const userId = getUserId();  
@@ -592,17 +598,17 @@ window.googleLogin = async function () {
 
         const data = await window.loadUserData(userId);  
         if (data) {  
-            balance = Math.max(parseFloat(localStorage.getItem('sst_bal')) || 0, data.balance || 0);
-            totalSessions = Math.max(parseInt(localStorage.getItem('sst_total_sessions')) || 0, data.totalSessions || 0);
+            balance = Math.max(0, data.balance || 0);
+            totalSessions = Math.max(0, data.totalSessions || 0);
 
             referralCount = data.referralCount || 0;
-            boostLevel = Math.max(parseInt(localStorage.getItem('sst_boost_lvl')) || 0, data.boostLevel || 0);
-            miningStartTime = Math.max(parseInt(localStorage.getItem('sst_mine_start')) || 0, data.miningStartTime || 0);
-            boostStartTime = Math.max(parseInt(localStorage.getItem('sst_boost_start')) || 0, data.boostStartTime || 0);
-            lastCalcTime = Math.max(parseInt(localStorage.getItem('sst_last_calc')) || 0, data.lastCalcTime || 0);
+            boostLevel = data.boostLevel || 0;
+            miningStartTime = data.miningStartTime || 0;
+            boostStartTime = data.boostStartTime || 0;
+            lastCalcTime = data.lastCalcTime || Date.now();
 
-            if (data.name) window.savedName = data.name;  
-            if (data.photo) window.savedPic = data.photo;  
+            if (data.name) { window.savedName = data.name; }
+            if (data.photo) { window.savedPic = data.photo; }  
             window.renderProfile();  
         }  
 
@@ -612,7 +618,6 @@ window.googleLogin = async function () {
             if (!userDataCheck || !userDataCheck.welcomeBonusClaimed) {
                 balance += 500;
                 localStorage.setItem("sst_welcome_bonus", "done");
-                localStorage.setItem("sst_bal", balance.toFixed(6));
                 
                 try {
                     await window.saveUserData(userId, { 
@@ -682,10 +687,10 @@ window.googleLogin = async function () {
                 status.style.display = "block";  
                 if (typeof window.uploadProfileImage === "function") {  
                     const uploadedUrl = await window.uploadProfileImage(userId, file);  
-                    if (uploadedUrl) { newPicUrl = uploadedUrl; window.savedPic = newPicUrl; localStorage.setItem('sst_custom_pic', newPicUrl); }  
+                    if (uploadedUrl) { newPicUrl = uploadedUrl; window.savedPic = newPicUrl; }  
                 }  
             }  
-            if (n) { window.savedName = n; localStorage.setItem('sst_custom_name', n); }  
+            if (n) { window.savedName = n; }  
             window.renderProfile();  
             await window.saveUserData(userId, { name: window.savedName, photo: window.savedPic });  
             alert("Profile Saved Successfully!");  
@@ -728,19 +733,12 @@ window.googleLogin = async function () {
     const BOOST_RATE_3X = 1000 / (4 * 60 * 60);  
     const BOOST_RATE_4X = 1500 / (4 * 60 * 60);  
 
-    let lastCalcTime = parseInt(localStorage.getItem('sst_last_calc')) || Date.now();  
-    let miningStartTime = parseInt(localStorage.getItem('sst_mine_start')) || 0;  
-    let boostLevel = parseInt(localStorage.getItem('sst_boost_lvl')) || 0;  
-    let boostStartTime = parseInt(localStorage.getItem('sst_boost_start')) || 0;  
-    let saveCounter = 0;  
-
     async function claimDailyReward(){  
         const userId = getUserId();  
         let today = new Date().toDateString();  
         const userData = await window.loadUserData(userId);  
         if(userData && userData.lastDailyReward !== today){  
             balance += 100;  
-            localStorage.setItem("sst_bal", balance.toFixed(6));
             
             await window.saveUserData(userId, { balance: balance, lastDailyReward: today });  
             addNotification("🎁 Daily Reward Claimed (100 SUTRA)");  
@@ -781,8 +779,6 @@ window.googleLogin = async function () {
             let earned = deltaSec * currentRate; 
             balance += earned;
             sessionEarned += earned; 
-            
-            localStorage.setItem("sst_bal", balance.toFixed(6));
         }   
           
         if(balance < 0) balance = 0;  
@@ -790,20 +786,17 @@ window.googleLogin = async function () {
           
         if (now - miningStartTime >= DURATION_24H && miningStartTime > 0) {  
             miningStartTime = 0;  
-            localStorage.setItem('sst_mine_start', 0);  
-            
+              
             addNotification(`🎉 Mining Completed! Earned: ${sessionEarned.toFixed(3)} SUTRA. Watch Ad To Start Again.`);
             addHistory("✅ Mining Completed");  
         }  
 
         if (boostLevel > 0 && now - boostStartTime >= DURATION_4H) {  
             boostLevel = 0;  
-            localStorage.setItem('sst_boost_lvl', 0);  
             addNotification("🚀 Booster Expired! Watch Ad Again To Reactivate.");
         }  
 
         lastCalcTime = now;  
-        localStorage.setItem('sst_last_calc', lastCalcTime);  
 
         if(getUserId()) {  
             saveCounter++;  
@@ -926,10 +919,7 @@ window.googleLogin = async function () {
             lastCalcTime = Date.now();  
             sessionEarned = 0; 
             totalSessions++; 
-            
-            localStorage.setItem('sst_total_sessions', totalSessions);
-            localStorage.setItem('sst_mine_start', miningStartTime);  
-            
+              
             try {
                 window.saveUserData(getUserId(), {
                     miningStartTime: miningStartTime,
@@ -948,8 +938,6 @@ window.googleLogin = async function () {
         showAd(() => {  
             boostLevel++;  
             boostStartTime = Date.now();  
-            localStorage.setItem('sst_boost_lvl', boostLevel);  
-            localStorage.setItem('sst_boost_start', boostStartTime);  
             
             try {
                 window.saveUserData(getUserId(), {
@@ -966,7 +954,6 @@ window.googleLogin = async function () {
     function addNotification(message) {  
         notifications.unshift({ msg: message, time: new Date().toLocaleString() });  
         if(notifications.length > 200) notifications.pop();  
-        localStorage.setItem("sst_notifications", JSON.stringify(notifications));  
         renderNotifications();  
     }  
 
@@ -980,7 +967,6 @@ window.googleLogin = async function () {
     function addHistory(text){  
         miningHistory.unshift({ msg: text, time: new Date().toLocaleString() });  
         if(miningHistory.length > 500) miningHistory.pop();  
-        localStorage.setItem("sst_history", JSON.stringify(miningHistory));  
         renderHistory();  
     } 
 
@@ -1101,7 +1087,6 @@ window.googleLogin = async function () {
         try {  
             const userId = getUserId();  
             if(userId) await window.saveUserData(userId, { online: false, lastHeartbeat: 0 });  
-            localStorage.removeItem("sst_custom_name"); localStorage.removeItem("sst_custom_pic");  
             await window.auth.signOut();  
             alert("Logged Out Successfully"); location.reload();  
         } catch(err) { alert(err.message); }  
